@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.debthunter</groupId>
+    <artifactId>debt-hunter</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>cli</artifactId>
+
+  <properties>
+    <mainClass>com.debthunter.cli.DebtHunterCli</mainClass>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>application</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>engine-codemaat</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>engine-architecture</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>engine-static-analysis</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>integration</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>info.picocli</groupId>
+      <artifactId>picocli</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>debt-hunter</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>info.picocli</groupId>
+              <artifactId>picocli-codegen</artifactId>
+              <version>${picocli.version}</version>
+            </path>
+          </annotationProcessorPaths>
+          <compilerArgs>
+            <arg>-Aproject=com.debthunter/cli</arg>
+          </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>${mainClass}</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <!-- DebtHunterCli.main() is the unavoidable OS-boundary glue (System.exit()); it is
+           exercised via DebtHunterCli.execute() in tests but the exit call itself cannot be
+           unit-tested, so it is excluded from the coverage gate like any process bootstrap. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/DebtHunterCli.class</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
