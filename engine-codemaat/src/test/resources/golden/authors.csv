@@ -1,0 +1,4 @@
+entity,n-authors,n-revs
+src/main/java/com/example/PaymentProcessor.java,1,25
+src/main/java/com/example/Utils.java,4,5
+src/main/java/com/example/Config.java,1,1

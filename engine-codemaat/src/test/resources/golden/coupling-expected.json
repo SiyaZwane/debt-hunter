@@ -1,0 +1,19 @@
+[ {
+  "category" : "TEMPORAL_COUPLING",
+  "confidence" : 0.6,
+  "evidence" : {
+    "averageRevs" : 12.0,
+    "coupled" : "src/main/java/com/example/PaymentValidator.java",
+    "degree" : 80.0,
+    "engine" : "code-maat"
+  },
+  "fingerprint" : "codemaat.temporal-coupling:src/main/java/com/example/PaymentProcessor.java->src/main/java/com/example/PaymentValidator.java",
+  "id" : "codemaat.temporal-coupling:src/main/java/com/example/PaymentProcessor.java->src/main/java/com/example/PaymentValidator.java",
+  "isNew" : false,
+  "message" : "src/main/java/com/example/PaymentProcessor.java and src/main/java/com/example/PaymentValidator.java change together in 80% of commits",
+  "path" : "src/main/java/com/example/PaymentProcessor.java",
+  "ruleId" : "codemaat.temporal-coupling",
+  "score" : 80.0,
+  "severity" : "HIGH",
+  "startLine" : 0
+} ]

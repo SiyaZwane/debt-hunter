@@ -17,9 +17,22 @@
       <groupId>com.debthunter</groupId>
       <artifactId>engine-spi</artifactId>
     </dependency>
+    <!-- JGit is a general-purpose library, unrelated to Code Maat: it lets CodeMaatLogWriter
+         build the git2-format log Code Maat expects without needing a native git binary. -->
+    <dependency>
+      <groupId>org.eclipse.jgit</groupId>
+      <artifactId>org.eclipse.jgit</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.debthunter</groupId>
       <artifactId>testkit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Test-only convenience for golden-file comparisons; does not weaken AC-10's isolation
+         guarantee, which is about Code Maat classes, not the output module. -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>output</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

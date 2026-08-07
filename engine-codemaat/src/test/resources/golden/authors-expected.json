@@ -1,0 +1,18 @@
+[ {
+  "category" : "KNOWLEDGE_CONCENTRATION",
+  "confidence" : 1.0,
+  "evidence" : {
+    "authorCount" : 1.0,
+    "changeFrequency" : 25.0,
+    "engine" : "code-maat"
+  },
+  "fingerprint" : "codemaat.knowledge-concentration:src/main/java/com/example/PaymentProcessor.java",
+  "id" : "codemaat.knowledge-concentration:src/main/java/com/example/PaymentProcessor.java",
+  "isNew" : false,
+  "message" : "src/main/java/com/example/PaymentProcessor.java has been modified by only 1 author(s) across 25 revisions",
+  "path" : "src/main/java/com/example/PaymentProcessor.java",
+  "ruleId" : "codemaat.knowledge-concentration",
+  "score" : 25.0,
+  "severity" : "HIGH",
+  "startLine" : 0
+} ]

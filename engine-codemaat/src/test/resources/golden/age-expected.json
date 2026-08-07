@@ -1,0 +1,13 @@
+[ {
+  "name" : "age:src/main/java/com/example/PaymentProcessor.java",
+  "scope" : "src/main/java/com/example/PaymentProcessor.java",
+  "value" : 1.0
+}, {
+  "name" : "age:src/main/java/com/example/Utils.java",
+  "scope" : "src/main/java/com/example/Utils.java",
+  "value" : 10.0
+}, {
+  "name" : "age:src/main/java/com/example/Config.java",
+  "scope" : "src/main/java/com/example/Config.java",
+  "value" : 24.0
+} ]
