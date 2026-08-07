@@ -1,0 +1,9 @@
+.git
+.gradle
+.idea
+*.iml
+target
+dependency-reduced-pom.xml
+.mvn/wrapper/maven-wrapper.jar
+scripts
+docker/*.md

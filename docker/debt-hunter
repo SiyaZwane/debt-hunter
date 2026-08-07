@@ -1,0 +1,3 @@
+#!/bin/sh
+# Container entrypoint: runs the bundled jar on the jlink-trimmed JRE.
+exec /opt/debt-hunter/jre/bin/java -jar /opt/debt-hunter/debt-hunter.jar "$@"

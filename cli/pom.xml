@@ -82,6 +82,39 @@
           </archive>
         </configuration>
       </plugin>
+      <!-- Produces a single self-contained debt-hunter.jar (all dependencies bundled) for the
+           container image, so the runtime stage needs no dependency resolution at all. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${mainClass}</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <!-- DebtHunterCli.main() is the unavoidable OS-boundary glue (System.exit()); it is
            exercised via DebtHunterCli.execute() in tests but the exit call itself cannot be
            unit-tested, so it is excluded from the coverage gate like any process bootstrap. -->

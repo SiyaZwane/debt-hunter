@@ -1,13 +1,17 @@
 package com.debthunter.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.debthunter.testkit.FixtureRepoBuilder;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 @Tag("integration")
@@ -90,5 +94,24 @@ class GitHistoryProviderTest {
     List<CommitInfo> history = provider.history(plainDirectory, HistoryWindow.all());
 
     assertThat(history).isEmpty();
+  }
+
+  @Test
+  @DisabledOnOs(OS.WINDOWS)
+  void inspectOnUnreadableGitDirThrowsRatherThanReportingNotAGitRepository() {
+    Assumptions.assumeTrue(
+        !"root".equals(System.getProperty("user.name")), "permission bits are meaningless as root");
+    fixture = FixtureRepoBuilder.init().commitFile("a.txt", "one", "first commit");
+    Path dotGit = fixture.path().resolve(".git");
+
+    assertThat(dotGit.toFile().setReadable(false)).isTrue();
+    assertThat(dotGit.toFile().setExecutable(false)).isTrue();
+    try {
+      assertThatThrownBy(() -> provider.inspect(fixture.path()))
+          .isInstanceOf(RepositoryAccessException.class);
+    } finally {
+      dotGit.toFile().setExecutable(true);
+      dotGit.toFile().setReadable(true);
+    }
   }
 }

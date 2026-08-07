@@ -20,22 +20,45 @@ public final class FixtureRepoBuilder implements AutoCloseable {
 
   private final Path root;
   private final Git git;
+  private final boolean ownsDirectory;
 
-  private FixtureRepoBuilder(Path root, Git git) {
+  private FixtureRepoBuilder(Path root, Git git, boolean ownsDirectory) {
     this.root = root;
     this.git = git;
+    this.ownsDirectory = ownsDirectory;
   }
 
   /**
-   * Creates a new, empty Git repository (no commits) in a fresh temporary directory.
+   * Creates a new, empty Git repository (no commits) in a fresh temporary directory that {@link
+   * #close()} deletes.
    *
    * @return a builder for the new repository
    */
   public static FixtureRepoBuilder init() {
     try {
-      Path dir = Files.createTempDirectory("debt-hunter-fixture-");
-      Git git = Git.init().setDirectory(dir.toFile()).setInitialBranch("main").call();
-      return new FixtureRepoBuilder(dir, git);
+      return initAt(Files.createTempDirectory("debt-hunter-fixture-"), true);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * Creates a new, empty Git repository (no commits) at a caller-chosen, caller-owned directory.
+   * {@link #close()} closes the underlying JGit handles but leaves the directory on disk, since the
+   * caller — not this builder — decides its lifetime.
+   *
+   * @param directory the directory to initialise the repository in; created if it does not exist
+   * @return a builder for the new repository
+   */
+  public static FixtureRepoBuilder initAt(Path directory) {
+    return initAt(directory, false);
+  }
+
+  private static FixtureRepoBuilder initAt(Path directory, boolean ownsDirectory) {
+    try {
+      Files.createDirectories(directory);
+      Git git = Git.init().setDirectory(directory.toFile()).setInitialBranch("main").call();
+      return new FixtureRepoBuilder(directory, git, ownsDirectory);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     } catch (GitAPIException e) {
@@ -137,10 +160,17 @@ public final class FixtureRepoBuilder implements AutoCloseable {
     return git;
   }
 
-  /** Closes the underlying JGit repository and deletes its temporary directory. */
+  /**
+   * Closes the underlying JGit repository. If this builder created its own temporary directory (via
+   * {@link #init()}), also deletes it; a directory passed to {@link #initAt(Path)} is left alone,
+   * since the caller owns its lifetime.
+   */
   @Override
   public void close() {
     git.close();
+    if (!ownsDirectory) {
+      return;
+    }
     try (var paths = Files.walk(root)) {
       paths.sorted(Comparator.reverseOrder()).forEach(FixtureRepoBuilder::deleteQuietly);
     } catch (IOException e) {

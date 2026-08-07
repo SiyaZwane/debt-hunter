@@ -21,6 +21,7 @@ public final class GitHistoryProvider implements RepositoryHistoryProvider {
   public RepositoryInfo inspect(Path repoPath) {
     FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(repoPath.toFile());
     if (builder.getGitDir() == null) {
+      failIfGitDirExistsButIsUnreadable(repoPath);
       return RepositoryInfo.notAGitRepository();
     }
     try (Repository repository = builder.build()) {
@@ -42,6 +43,7 @@ public final class GitHistoryProvider implements RepositoryHistoryProvider {
   public List<CommitInfo> history(Path repoPath, HistoryWindow window) {
     FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(repoPath.toFile());
     if (builder.getGitDir() == null) {
+      failIfGitDirExistsButIsUnreadable(repoPath);
       return List.of();
     }
     HistoryWindow effectiveWindow = window == null ? HistoryWindow.all() : window;
@@ -65,6 +67,25 @@ public final class GitHistoryProvider implements RepositoryHistoryProvider {
       return List.copyOf(commits);
     } catch (IOException | GitAPIException e) {
       throw new RepositoryAccessException("Failed to read history for " + repoPath, e);
+    }
+  }
+
+  /**
+   * JGit's {@code findGitDir} treats "exists but I can't read it" the same as "doesn't exist" and
+   * returns {@code null} either way. A repository that's genuinely absent is a configuration
+   * problem the caller can fix by pointing at the right path; a repository that exists but is
+   * unreadable (e.g. restrictive permissions) is an access failure the caller can't fix by retrying
+   * with different arguments, so it must not be silently downgraded to "not a git repo".
+   */
+  private void failIfGitDirExistsButIsUnreadable(Path repoPath) {
+    Path dotGit = repoPath.resolve(".git");
+    if (!Files.isDirectory(dotGit)) {
+      return;
+    }
+    try (var entries = Files.list(dotGit)) {
+      entries.findAny();
+    } catch (IOException e) {
+      throw new RepositoryAccessException("Repository directory is not readable: " + dotGit, e);
     }
   }
 

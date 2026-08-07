@@ -55,6 +55,12 @@
 
     <!-- Enforced by jacoco-maven-plugin's check goal; see global rule on 80% line coverage -->
     <jacoco.line.coverage.minimum>0.80</jacoco.line.coverage.minimum>
+
+    <!-- "platform" tests need real GitHub/Azure DevOps credentials; "docker" tests need a
+         working Docker daemon. Neither runs by default; override on the command line, e.g.
+         mvn verify -Dfailsafe.groups=docker -Dsurefire.excludedGroups=integration,platform -->
+    <surefire.excludedGroups>integration,platform,docker</surefire.excludedGroups>
+    <failsafe.groups>integration</failsafe.groups>
   </properties>
 
   <dependencyManagement>
@@ -248,7 +254,7 @@
           <artifactId>maven-surefire-plugin</artifactId>
           <version>${maven-surefire-plugin.version}</version>
           <configuration>
-            <excludedGroups>integration,platform</excludedGroups>
+            <excludedGroups>${surefire.excludedGroups}</excludedGroups>
           </configuration>
         </plugin>
         <plugin>
@@ -256,7 +262,7 @@
           <artifactId>maven-failsafe-plugin</artifactId>
           <version>${maven-failsafe-plugin.version}</version>
           <configuration>
-            <groups>integration</groups>
+            <groups>${failsafe.groups}</groups>
             <includes>
               <include>**/*.java</include>
             </includes>
