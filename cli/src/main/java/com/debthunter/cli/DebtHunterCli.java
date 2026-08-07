@@ -13,7 +13,8 @@ import picocli.CommandLine.Command;
     name = "debt-hunter",
     mixinStandardHelpOptions = true,
     version = "debt-hunter 0.1.0-SNAPSHOT",
-    description = "Deterministic, containerised command-line technical-debt analyser.")
+    description = "Deterministic, containerised command-line technical-debt analyser.",
+    subcommands = {ScanCommand.class})
 public final class DebtHunterCli implements Runnable {
 
   /**

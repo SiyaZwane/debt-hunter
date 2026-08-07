@@ -287,11 +287,36 @@
                 <goal>prepare-agent-integration</goal>
               </goals>
             </execution>
+            <!-- Unit tests write jacoco.exec, integration tests write jacoco-it.exec; merge
+                 both before reporting/checking so coverage from either counts. -->
+            <execution>
+              <id>jacoco-merge</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>merge</goal>
+              </goals>
+              <configuration>
+                <fileSets>
+                  <fileSet>
+                    <directory>${project.build.directory}</directory>
+                    <includes>
+                      <include>jacoco.exec</include>
+                      <include>jacoco-it.exec</include>
+                    </includes>
+                  </fileSet>
+                </fileSets>
+                <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+              </configuration>
+            </execution>
             <execution>
               <id>jacoco-report</id>
+              <phase>verify</phase>
               <goals>
                 <goal>report</goal>
               </goals>
+              <configuration>
+                <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+              </configuration>
             </execution>
             <execution>
               <id>jacoco-check</id>
@@ -300,6 +325,7 @@
                 <goal>check</goal>
               </goals>
               <configuration>
+                <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
                 <rules>
                   <rule>
                     <element>BUNDLE</element>
