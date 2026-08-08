@@ -1,6 +1,7 @@
 package com.debthunter.output;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.debthunter.domain.AnalysisRun;
 import com.debthunter.domain.Category;
@@ -65,6 +66,33 @@ class JsonReporterTest {
     Path second = reporter.write(scanResult, outputDir.resolve("run2"));
 
     assertThat(Files.readAllBytes(first)).isEqualTo(Files.readAllBytes(second));
+  }
+
+  @Test
+  void writesSchemaVersionField(@TempDir Path outputDir) throws IOException {
+    Path written = reporter.write(sampleScanResult(List.of()), outputDir);
+
+    JsonNode root = reader.readTree(written.toFile());
+    assertThat(root.get("schemaVersion").asText()).isEqualTo(JsonReport.CURRENT_SCHEMA_VERSION);
+  }
+
+  @Test
+  void rejectsAFindingWithABlankRuleIdInsteadOfWritingAnIncompleteReport(@TempDir Path outputDir) {
+    Finding blankRuleId =
+        Finding.builder()
+            .id("f-1")
+            .ruleId("  ")
+            .category(Category.HOTSPOT)
+            .severity(Severity.LOW)
+            .path("Foo.java")
+            .message("message")
+            .fingerprint("fp-1")
+            .build();
+
+    assertThatThrownBy(() -> reporter.write(sampleScanResult(List.of(blankRuleId)), outputDir))
+        .isInstanceOf(ReportWriteException.class)
+        .hasMessageContaining("ruleId");
+    assertThat(outputDir.resolve(JsonReporter.FILE_NAME)).doesNotExist();
   }
 
   @Test

@@ -12,4 +12,14 @@ public final class ReportWriteException extends RuntimeException {
   public ReportWriteException(String message, Throwable cause) {
     super(message, cause);
   }
+
+  /**
+   * Creates the exception with a message only, for validation failures that have no underlying I/O
+   * cause.
+   *
+   * @param message a human-readable description of what failed
+   */
+  public ReportWriteException(String message) {
+    super(message);
+  }
 }
