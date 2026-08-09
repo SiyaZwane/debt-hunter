@@ -22,6 +22,8 @@ import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
+import com.debthunter.policy.BaselineComparator;
+import com.debthunter.policy.BaselineResolver;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
 import java.nio.file.Path;
@@ -48,6 +50,8 @@ class ScanUseCaseTest {
         new MarkdownReporter(),
         new MetricsReporter(),
         new SarifReporter(),
+        new BaselineResolver(),
+        new BaselineComparator(),
         "0.1.0-test",
         timeout,
         Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
@@ -55,7 +59,7 @@ class ScanUseCaseTest {
 
   private ScanRequest requestFor(Path repo, Path outputDir, List<AnalysisEngine> engines) {
     return new ScanRequest(
-        repo, outputDir, AnalysisMode.FULL, null, null, engines, null, false, null);
+        repo, outputDir, AnalysisMode.FULL, null, null, engines, null, false, null, null);
   }
 
   private AnalysisEngine engineReturning(EngineResult result) {
@@ -82,7 +86,8 @@ class ScanUseCaseTest {
             .execute(requestFor(repo, outputDir, List.of(engine)));
 
     assertThat(outcome.exitCode()).isZero();
-    assertThat(outcome.scanResult().findings()).containsExactly(finding);
+    // With no baseline configured, every finding compares as NEW.
+    assertThat(outcome.scanResult().findings()).containsExactly(finding.withIsNew(true));
     assertThat(outcome.scanResult().metrics()).containsEntry("churn", metric);
     assertThat(outcome.scanResult().run().engines()).hasSize(1);
     assertThat(outcome.scanResult().run().engines().get(0).status()).isEqualTo(EngineHealth.OK);

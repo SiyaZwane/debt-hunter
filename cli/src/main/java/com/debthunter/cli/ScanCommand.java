@@ -9,6 +9,8 @@ import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
+import com.debthunter.policy.BaselineComparator;
+import com.debthunter.policy.BaselineResolver;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.repository.HistoryWindow;
 import java.nio.file.Path;
@@ -54,6 +56,9 @@ public final class ScanCommand implements Callable<Integer> {
       description = "Only consider commits at or after this ISO-8601 instant.")
   private Instant historyWindowSince;
 
+  @Option(names = "--baseline", description = "Path to a baseline artefact to compare against.")
+  private Path baselinePath;
+
   private final ScanUseCase scanUseCase;
   private final List<AnalysisEngine> engines;
 
@@ -74,8 +79,28 @@ public final class ScanCommand implements Callable<Integer> {
    */
   ScanCommand(
       Path repoPath, Path outputDir, ScanUseCase scanUseCase, List<AnalysisEngine> engines) {
+    this(repoPath, outputDir, null, scanUseCase, engines);
+  }
+
+  /**
+   * Constructs the command with explicit collaborators, target paths, and a baseline path,
+   * bypassing picocli option parsing entirely, for testing.
+   *
+   * @param repoPath repository path to scan; defaults to {@code "."} if {@code null}
+   * @param outputDir directory to write report files into
+   * @param baselinePath path to a baseline artefact to compare against, or {@code null}
+   * @param scanUseCase the use case to delegate to
+   * @param engines the analysis engines to run
+   */
+  ScanCommand(
+      Path repoPath,
+      Path outputDir,
+      Path baselinePath,
+      ScanUseCase scanUseCase,
+      List<AnalysisEngine> engines) {
     this.repoPath = repoPath == null ? Path.of(".") : repoPath;
     this.outputDir = outputDir;
+    this.baselinePath = baselinePath;
     this.scanUseCase = scanUseCase;
     this.engines = engines;
   }
@@ -87,6 +112,8 @@ public final class ScanCommand implements Callable<Integer> {
         new MarkdownReporter(),
         new MetricsReporter(),
         new SarifReporter(),
+        new BaselineResolver(),
+        new BaselineComparator(),
         TOOL_VERSION);
   }
 
@@ -102,7 +129,8 @@ public final class ScanCommand implements Callable<Integer> {
             engines,
             historyWindowSince == null ? null : HistoryWindow.since(historyWindowSince),
             offline,
-            failOn);
+            failOn,
+            baselinePath);
 
     ScanOutcome outcome = scanUseCase.execute(request);
 

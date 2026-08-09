@@ -18,7 +18,8 @@ public record AnalysisRun(
     String pullRequest,
     HistoryDepth historyDepth,
     List<EngineStatus> engines,
-    boolean degraded) {
+    boolean degraded,
+    String baselineProvenance) {
 
   /** Validates required fields and defensively copies {@code engines}. */
   public AnalysisRun {
@@ -58,6 +59,7 @@ public record AnalysisRun(
     private String pullRequest;
     private HistoryDepth historyDepth;
     private List<EngineStatus> engines = List.of();
+    private String baselineProvenance;
 
     private Builder() {}
 
@@ -122,6 +124,18 @@ public record AnalysisRun(
     }
 
     /**
+     * Records where this run's baseline came from (e.g. {@code "EXPLICIT"}, {@code "NONE"}).
+     *
+     * @param baselineProvenance the provenance, or {@code null} if baseline resolution was never
+     *     attempted
+     * @return this builder, for chaining
+     */
+    public Builder baselineProvenance(String baselineProvenance) {
+      this.baselineProvenance = baselineProvenance;
+      return this;
+    }
+
+    /**
      * Builds the {@link AnalysisRun}, computing {@code degraded} from {@link #engines}.
      *
      * @return the constructed, immutable run
@@ -142,7 +156,8 @@ public record AnalysisRun(
           pullRequest,
           historyDepth,
           engines,
-          computedDegraded);
+          computedDegraded,
+          baselineProvenance);
     }
   }
 }

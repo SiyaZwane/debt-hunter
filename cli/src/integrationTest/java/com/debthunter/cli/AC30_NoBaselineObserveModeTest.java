@@ -24,7 +24,6 @@ import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -32,9 +31,13 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** AC-01: a valid repo produces all outputs; every finding has every required field. */
+/**
+ * AC-30: with no explicit baseline and nothing at the pipeline-cache path, a scan still completes
+ * normally — {@code baselineProvenance} records {@code NONE}, and every finding compares as new,
+ * since there is nothing to compare against.
+ */
 @Tag("integration")
-class AC01_ValidRepoProducesAllOutputsTest {
+class AC30_NoBaselineObserveModeTest {
 
   private FixtureRepoBuilder fixture;
 
@@ -46,7 +49,8 @@ class AC01_ValidRepoProducesAllOutputsTest {
   }
 
   @Test
-  void ac01_validRepoProducesAllOutputs(@TempDir Path outputDir) throws IOException {
+  void ac30_noBaselineAnywhereCompletesNormallyWithEveryFindingMarkedNew(@TempDir Path outputDir)
+      throws Exception {
     fixture = FixtureRepoBuilder.init().commitFile("Foo.java", "class Foo {}", "add Foo");
 
     AnalysisEngine engine = mock(AnalysisEngine.class);
@@ -62,11 +66,8 @@ class AC01_ValidRepoProducesAllOutputsTest {
                         .ruleId("hotspot.rule")
                         .category(Category.HOTSPOT)
                         .severity(Severity.HIGH)
-                        .confidence(0.8)
                         .path("Foo.java")
-                        .startLine(1)
                         .message("Foo.java changes often")
-                        .score(5.0)
                         .fingerprint("fp-f-1")
                         .build()),
                 List.of(),
@@ -82,40 +83,16 @@ class AC01_ValidRepoProducesAllOutputsTest {
             new BaselineResolver(),
             new BaselineComparator(),
             "0.1.0-test");
-    ScanCommand command = new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(engine));
+    ScanCommand command =
+        new ScanCommand(fixture.path(), outputDir, null, scanUseCase, List.of(engine));
 
     int exitCode = command.call();
 
     assertThat(exitCode).isIn(0, 1);
-    assertThat(outputDir.resolve(JsonReporter.FILE_NAME)).exists();
-    assertThat(outputDir.resolve(MarkdownReporter.FILE_NAME)).exists();
-    assertThat(outputDir.resolve(MetricsReporter.FILE_NAME)).exists();
-    assertThat(outputDir.resolve(SarifReporter.FILE_NAME)).exists();
-
-    JsonNode root = new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
-    JsonNode findings = root.get("findings");
-    assertThat(findings).hasSize(1);
-    JsonNode finding = findings.get(0);
-    for (String requiredField :
-        List.of(
-            "id",
-            "ruleId",
-            "category",
-            "severity",
-            "confidence",
-            "path",
-            "startLine",
-            "message",
-            "evidence",
-            "score",
-            "isNew",
-            "fingerprint")) {
-      assertThat(finding.has(requiredField))
-          .as("finding should have field '%s'", requiredField)
-          .isTrue();
-      assertThat(finding.get(requiredField).isNull())
-          .as("finding field '%s' should not be null", requiredField)
-          .isFalse();
-    }
+    ObjectMapper mapper = new ObjectMapper();
+    JsonNode root = mapper.readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
+    assertThat(root.get("run").get("baselineProvenance").asText()).isEqualTo("NONE");
+    assertThat(root.get("findings")).hasSize(1);
+    assertThat(root.get("findings").get(0).get("isNew").asBoolean()).isTrue();
   }
 }

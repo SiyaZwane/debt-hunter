@@ -25,5 +25,11 @@
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
+    <!-- Reuses DeterministicObjectMapper and BaselineSigner so a baseline's signature is verified
+         with exactly the same canonical bytes BaselineWriter signed it with. -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>output</artifactId>
+    </dependency>
   </dependencies>
 </project>
