@@ -8,6 +8,7 @@ import com.debthunter.engine.spi.AnalysisMode;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.repository.HistoryWindow;
 import java.nio.file.Path;
@@ -85,6 +86,7 @@ public final class ScanCommand implements Callable<Integer> {
         new JsonReporter(),
         new MarkdownReporter(),
         new MetricsReporter(),
+        new SarifReporter(),
         TOOL_VERSION);
   }
 

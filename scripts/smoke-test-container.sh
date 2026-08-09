@@ -2,7 +2,7 @@
 # Builds the Debt Hunter image, runs it offline against a real fixture repo, and asserts:
 #   - the image builds and runs successfully with --network none
 #   - exit code is 0 or 1
-#   - all 3 report files are produced (debt-hunter.json, summary.md, metrics.json)
+#   - all 4 report files are produced (debt-hunter.json, summary.md, metrics.json, debt-hunter.sarif)
 #   - the container does not run as root
 #   - the container has no elevated Linux capabilities
 #
@@ -48,13 +48,13 @@ if [ "${EXIT_CODE}" -ne 0 ] && [ "${EXIT_CODE}" -ne 1 ]; then
 fi
 
 echo "==> Checking output files"
-for file in debt-hunter.json summary.md metrics.json; do
+for file in debt-hunter.json summary.md metrics.json debt-hunter.sarif; do
   if [ ! -f "${OUTPUT_DIR}/${file}" ]; then
     echo "FAIL: missing output file ${file}" >&2
     exit 1
   fi
 done
-echo "OK: all 3 report files present"
+echo "OK: all 4 report files present"
 
 echo "==> Checking the image runs as a non-root user"
 IMAGE_USER="$(docker inspect "${IMAGE_TAG}" --format '{{.Config.User}}')"

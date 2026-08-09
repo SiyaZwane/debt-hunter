@@ -17,6 +17,7 @@ import com.debthunter.engine.spi.RepositoryContext;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -75,6 +76,7 @@ class AC01_ValidRepoProducesAllOutputsTest {
             new JsonReporter(),
             new MarkdownReporter(),
             new MetricsReporter(),
+            new SarifReporter(),
             "0.1.0-test");
     ScanCommand command = new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(engine));
 
@@ -84,6 +86,7 @@ class AC01_ValidRepoProducesAllOutputsTest {
     assertThat(outputDir.resolve(JsonReporter.FILE_NAME)).exists();
     assertThat(outputDir.resolve(MarkdownReporter.FILE_NAME)).exists();
     assertThat(outputDir.resolve(MetricsReporter.FILE_NAME)).exists();
+    assertThat(outputDir.resolve(SarifReporter.FILE_NAME)).exists();
 
     JsonNode root = new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
     JsonNode findings = root.get("findings");

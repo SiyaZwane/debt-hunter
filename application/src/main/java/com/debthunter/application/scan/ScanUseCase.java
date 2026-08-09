@@ -18,6 +18,7 @@ import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.ReportWriteException;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.repository.HistoryWindow;
 import com.debthunter.repository.RepositoryAccessException;
 import com.debthunter.repository.RepositoryHistoryProvider;
@@ -55,6 +56,7 @@ public final class ScanUseCase {
   private final JsonReporter jsonReporter;
   private final MarkdownReporter markdownReporter;
   private final MetricsReporter metricsReporter;
+  private final SarifReporter sarifReporter;
   private final String toolVersion;
   private final Duration engineTimeout;
   private final Clock clock;
@@ -66,6 +68,7 @@ public final class ScanUseCase {
    * @param jsonReporter writes {@code debt-hunter.json}
    * @param markdownReporter writes {@code summary.md}
    * @param metricsReporter writes {@code metrics.json}
+   * @param sarifReporter writes {@code debt-hunter.sarif}
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    */
   public ScanUseCase(
@@ -73,12 +76,14 @@ public final class ScanUseCase {
       JsonReporter jsonReporter,
       MarkdownReporter markdownReporter,
       MetricsReporter metricsReporter,
+      SarifReporter sarifReporter,
       String toolVersion) {
     this(
         historyProvider,
         jsonReporter,
         markdownReporter,
         metricsReporter,
+        sarifReporter,
         toolVersion,
         DEFAULT_ENGINE_TIMEOUT,
         Clock.systemUTC());
@@ -91,6 +96,7 @@ public final class ScanUseCase {
    * @param jsonReporter writes {@code debt-hunter.json}
    * @param markdownReporter writes {@code summary.md}
    * @param metricsReporter writes {@code metrics.json}
+   * @param sarifReporter writes {@code debt-hunter.sarif}
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    * @param engineTimeout the maximum time to wait for any single engine
    * @param clock the clock used for timestamps and duration measurement
@@ -100,6 +106,7 @@ public final class ScanUseCase {
       JsonReporter jsonReporter,
       MarkdownReporter markdownReporter,
       MetricsReporter metricsReporter,
+      SarifReporter sarifReporter,
       String toolVersion,
       Duration engineTimeout,
       Clock clock) {
@@ -107,6 +114,7 @@ public final class ScanUseCase {
     this.jsonReporter = Objects.requireNonNull(jsonReporter, "jsonReporter");
     this.markdownReporter = Objects.requireNonNull(markdownReporter, "markdownReporter");
     this.metricsReporter = Objects.requireNonNull(metricsReporter, "metricsReporter");
+    this.sarifReporter = Objects.requireNonNull(sarifReporter, "sarifReporter");
     this.toolVersion = Objects.requireNonNull(toolVersion, "toolVersion");
     this.engineTimeout = Objects.requireNonNull(engineTimeout, "engineTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -193,6 +201,7 @@ public final class ScanUseCase {
       jsonReporter.write(scanResult, request.outputDir());
       markdownReporter.write(scanResult, request.outputDir());
       metricsReporter.write(scanResult, request.outputDir());
+      sarifReporter.write(scanResult, request.outputDir());
     } catch (ReportWriteException e) {
       return ScanOutcome.ofError(EXIT_INTERNAL_ERROR, "Failed to write outputs: " + e.getMessage());
     }

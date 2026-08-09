@@ -15,6 +15,7 @@ import com.debthunter.engine.spi.RepositoryContext;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import java.nio.file.Path;
@@ -52,6 +53,7 @@ class BC02_NoApplicableScopeTest {
             new JsonReporter(),
             new MarkdownReporter(),
             new MetricsReporter(),
+            new SarifReporter(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(outOfScopeEngine));
