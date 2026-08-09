@@ -25,6 +25,12 @@ LABEL org.opencontainers.image.title="Debt Hunter" \
 ARG DEBT_HUNTER_VERSION=0.1.0-SNAPSHOT
 LABEL org.opencontainers.image.version="${DEBT_HUNTER_VERSION}"
 
+# git itself needs no network at runtime; installing it here keeps RenameTracker's rename-history
+# resolution (git log --follow) fully functional inside the container, not just on dev hosts.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 debt-hunter \
     && useradd --uid 10001 --gid debt-hunter --shell /usr/sbin/nologin --no-create-home debt-hunter
 

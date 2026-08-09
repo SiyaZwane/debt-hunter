@@ -5,16 +5,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.debthunter.domain.Category;
 import com.debthunter.domain.Finding;
 import com.debthunter.domain.Severity;
+import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class CodeMaatFindingMapperTest {
 
   private final CodeMaatFindingMapper mapper = new CodeMaatFindingMapper();
 
+  // Not a Git repository, so RenameTracker falls back to returning entities unchanged — exactly
+  // what these pure mapping tests want, without paying for a real git subprocess per row.
+  @TempDir private Path repoPath;
+
   @Test
   void revisionsBelowThresholdProduceNoFindings() {
-    var findings = mapper.mapRevisions(List.of(new RevisionsRow("Foo.java", 1)));
+    var findings = mapper.mapRevisions(repoPath, List.of(new RevisionsRow("Foo.java", 1)));
 
     assertThat(findings).isEmpty();
   }
@@ -23,6 +29,7 @@ class CodeMaatFindingMapperTest {
   void revisionsAtChurnThresholdProduceOnlyChurnFinding() {
     var findings =
         mapper.mapRevisions(
+            repoPath,
             List.of(new RevisionsRow("Foo.java", CodeMaatFindingMapper.CHURN_MIN_REVISIONS)));
 
     assertThat(findings).hasSize(1);
@@ -34,6 +41,7 @@ class CodeMaatFindingMapperTest {
   void revisionsAtHotspotThresholdProduceBothChurnAndHotspotFindings() {
     var findings =
         mapper.mapRevisions(
+            repoPath,
             List.of(new RevisionsRow("Foo.java", CodeMaatFindingMapper.HOTSPOT_MIN_REVISIONS)));
 
     assertThat(findings).hasSize(2);
@@ -44,7 +52,7 @@ class CodeMaatFindingMapperTest {
 
   @Test
   void hotspotSeverityEscalatesAtHighRevisionCount() {
-    var findings = mapper.mapRevisions(List.of(new RevisionsRow("Foo.java", 30)));
+    var findings = mapper.mapRevisions(repoPath, List.of(new RevisionsRow("Foo.java", 30)));
     Finding hotspot =
         findings.stream().filter(f -> f.category() == Category.HOTSPOT).findFirst().orElseThrow();
 
@@ -53,7 +61,8 @@ class CodeMaatFindingMapperTest {
 
   @Test
   void couplingBelowThresholdProducesNoFindings() {
-    var findings = mapper.mapCoupling(List.of(new CouplingRow("A.java", "B.java", 10, 5)));
+    var findings =
+        mapper.mapCoupling(repoPath, List.of(new CouplingRow("A.java", "B.java", 10, 5)));
 
     assertThat(findings).isEmpty();
   }
@@ -62,6 +71,7 @@ class CodeMaatFindingMapperTest {
   void couplingAtThresholdProducesFinding() {
     var findings =
         mapper.mapCoupling(
+            repoPath,
             List.of(
                 new CouplingRow("A.java", "B.java", CodeMaatFindingMapper.COUPLING_MIN_DEGREE, 8)));
 
@@ -74,21 +84,22 @@ class CodeMaatFindingMapperTest {
 
   @Test
   void couplingSeverityEscalatesAtHighDegree() {
-    var findings = mapper.mapCoupling(List.of(new CouplingRow("A.java", "B.java", 90, 8)));
+    var findings =
+        mapper.mapCoupling(repoPath, List.of(new CouplingRow("A.java", "B.java", 90, 8)));
 
     assertThat(findings.get(0).severity()).isEqualTo(Severity.HIGH);
   }
 
   @Test
   void authorsWithManyContributorsProduceNoFindings() {
-    var findings = mapper.mapAuthors(List.of(new AuthorsRow("Foo.java", 5, 20)));
+    var findings = mapper.mapAuthors(repoPath, List.of(new AuthorsRow("Foo.java", 5, 20)));
 
     assertThat(findings).isEmpty();
   }
 
   @Test
   void authorsWithLowActivityProduceNoFindingsDespiteSingleAuthor() {
-    var findings = mapper.mapAuthors(List.of(new AuthorsRow("Foo.java", 1, 1)));
+    var findings = mapper.mapAuthors(repoPath, List.of(new AuthorsRow("Foo.java", 1, 1)));
 
     assertThat(findings).isEmpty();
   }
@@ -97,6 +108,7 @@ class CodeMaatFindingMapperTest {
   void singleAuthorWithSufficientActivityProducesKnowledgeConcentrationFinding() {
     var findings =
         mapper.mapAuthors(
+            repoPath,
             List.of(
                 new AuthorsRow(
                     "Foo.java",
@@ -117,8 +129,8 @@ class CodeMaatFindingMapperTest {
 
   @Test
   void fingerprintsAreDeterministicForTheSameInput() {
-    var first = mapper.mapRevisions(List.of(new RevisionsRow("Foo.java", 5))).get(0);
-    var second = mapper.mapRevisions(List.of(new RevisionsRow("Foo.java", 5))).get(0);
+    var first = mapper.mapRevisions(repoPath, List.of(new RevisionsRow("Foo.java", 5))).get(0);
+    var second = mapper.mapRevisions(repoPath, List.of(new RevisionsRow("Foo.java", 5))).get(0);
 
     assertThat(first.fingerprint()).isEqualTo(second.fingerprint());
     assertThat(first.id()).isEqualTo(second.id());

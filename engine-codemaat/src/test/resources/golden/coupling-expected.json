@@ -7,7 +7,7 @@
     "degree" : 80.0,
     "engine" : "code-maat"
   },
-  "fingerprint" : "codemaat.temporal-coupling:src/main/java/com/example/PaymentProcessor.java->src/main/java/com/example/PaymentValidator.java",
+  "fingerprint" : "f48bf4bd4d4f31ea9ef1f0fb7a84cb658c6b58c4ce2668119f372d29ac3b1efc",
   "id" : "codemaat.temporal-coupling:src/main/java/com/example/PaymentProcessor.java->src/main/java/com/example/PaymentValidator.java",
   "isNew" : false,
   "message" : "src/main/java/com/example/PaymentProcessor.java and src/main/java/com/example/PaymentValidator.java change together in 80% of commits",

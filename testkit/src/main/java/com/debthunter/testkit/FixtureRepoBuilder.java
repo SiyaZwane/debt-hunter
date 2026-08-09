@@ -123,6 +123,27 @@ public final class FixtureRepoBuilder implements AutoCloseable {
   }
 
   /**
+   * Deletes a tracked file and commits the deletion.
+   *
+   * @param relativePath path of the file relative to the repository root
+   * @param message the commit message
+   * @return this builder, for chaining
+   */
+  public FixtureRepoBuilder deleteFile(String relativePath, String message) {
+    try {
+      git.rm().addFilepattern(relativePath).call();
+      git.commit()
+          .setMessage(message)
+          .setAuthor(AUTHOR_NAME, AUTHOR_EMAIL)
+          .setCommitter(AUTHOR_NAME, AUTHOR_EMAIL)
+          .call();
+      return this;
+    } catch (GitAPIException e) {
+      throw new IllegalStateException("Failed to delete " + relativePath, e);
+    }
+  }
+
+  /**
    * Simulates a change hotspot by committing the same file repeatedly with different content.
    *
    * @param relativePath path of the file relative to the repository root

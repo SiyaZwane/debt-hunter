@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Every golden Code Maat CSV fixture, parsed and mapped, must still produce exactly the canonical
@@ -22,16 +23,21 @@ class CodeMaatGoldenFileTest {
   private final CodeMaatFindingMapper mapper = new CodeMaatFindingMapper();
   private final ObjectMapper json = DeterministicObjectMapper.create();
 
+  // Not a Git repository, so RenameTracker falls back to returning entities unchanged: these
+  // golden fixtures reference files that never existed in any real repository.
+  @TempDir private Path repoPath;
+
   @Test
   void revisionsGoldenFileProducesExpectedFindings() throws Exception {
     assertMatchesGolden(
-        "revisions", mapper.mapRevisions(parser.parseRevisions(readGolden("revisions.csv"))));
+        "revisions",
+        mapper.mapRevisions(repoPath, parser.parseRevisions(readGolden("revisions.csv"))));
   }
 
   @Test
   void couplingGoldenFileProducesExpectedFindings() throws Exception {
     assertMatchesGolden(
-        "coupling", mapper.mapCoupling(parser.parseCoupling(readGolden("coupling.csv"))));
+        "coupling", mapper.mapCoupling(repoPath, parser.parseCoupling(readGolden("coupling.csv"))));
   }
 
   @Test
@@ -42,7 +48,7 @@ class CodeMaatGoldenFileTest {
   @Test
   void authorsGoldenFileProducesExpectedFindings() throws Exception {
     assertMatchesGolden(
-        "authors", mapper.mapAuthors(parser.parseAuthors(readGolden("authors.csv"))));
+        "authors", mapper.mapAuthors(repoPath, parser.parseAuthors(readGolden("authors.csv"))));
   }
 
   private void assertMatchesGolden(String name, Object actual) throws Exception {

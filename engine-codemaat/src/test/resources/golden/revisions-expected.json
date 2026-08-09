@@ -6,7 +6,7 @@
     "changeFrequency" : 25.0,
     "engine" : "code-maat"
   },
-  "fingerprint" : "codemaat.churn:src/main/java/com/example/PaymentProcessor.java",
+  "fingerprint" : "c0e36e675efaeec5d610487909fdc1f3d5b28b224fa4213c45449b103cd25400",
   "id" : "codemaat.churn:src/main/java/com/example/PaymentProcessor.java",
   "isNew" : false,
   "message" : "src/main/java/com/example/PaymentProcessor.java has changed 25 times, indicating high churn",
@@ -23,7 +23,7 @@
     "changeFrequency" : 25.0,
     "engine" : "code-maat"
   },
-  "fingerprint" : "codemaat.hotspot:src/main/java/com/example/PaymentProcessor.java",
+  "fingerprint" : "f772a3b3da60e1cabd166a536e9a19617cd6d446387e1f88a13df4e215c0e9f5",
   "id" : "codemaat.hotspot:src/main/java/com/example/PaymentProcessor.java",
   "isNew" : false,
   "message" : "src/main/java/com/example/PaymentProcessor.java is a change hotspot (25 revisions)",
@@ -40,7 +40,7 @@
     "changeFrequency" : 5.0,
     "engine" : "code-maat"
   },
-  "fingerprint" : "codemaat.churn:src/main/java/com/example/Utils.java",
+  "fingerprint" : "33c9e7f219c44dc754ac07b8348d7c55d690490519d76132a13a962517d4ead6",
   "id" : "codemaat.churn:src/main/java/com/example/Utils.java",
   "isNew" : false,
   "message" : "src/main/java/com/example/Utils.java has changed 5 times, indicating high churn",
