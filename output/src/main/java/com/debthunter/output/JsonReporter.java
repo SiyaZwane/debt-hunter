@@ -41,12 +41,15 @@ public final class JsonReporter {
    * @param scanResult the result to write
    * @param outputDir the directory to write into; created if it does not exist
    * @return the path of the file written
+   * @throws ReportWriteException if any finding is missing a required field, or the file cannot be
+   *     written
    */
   public Path write(ScanResult scanResult, Path outputDir) {
+    validateFindings(scanResult.findings());
     Path target = outputDir.resolve(FILE_NAME);
     try {
       Files.createDirectories(outputDir);
-      objectMapper.writeValue(target.toFile(), withSortedFindings(scanResult));
+      objectMapper.writeValue(target.toFile(), JsonReport.of(withSortedFindings(scanResult)));
       return target;
     } catch (IOException e) {
       throw new ReportWriteException("Failed to write " + target, e);
@@ -62,5 +65,32 @@ public final class JsonReporter {
                     .thenComparingInt(Finding::startLine))
             .toList();
     return new ScanResult(scanResult.run(), sorted, scanResult.metrics(), scanResult.policy());
+  }
+
+  /**
+   * The record's own canonical constructor already rejects {@code null} required fields, but not
+   * blank ones (an empty {@code ruleId} is a valid string as far as {@code Objects.requireNonNull}
+   * is concerned). This is the extra check that catches that: every finding written to the report
+   * must have a meaningful, non-blank value for every field a consumer would need to act on it.
+   */
+  private void validateFindings(List<Finding> findings) {
+    for (Finding finding : findings) {
+      requireNonBlank(finding, "id", finding.id());
+      requireNonBlank(finding, "ruleId", finding.ruleId());
+      requireNonBlank(finding, "path", finding.path());
+      requireNonBlank(finding, "message", finding.message());
+      requireNonBlank(finding, "fingerprint", finding.fingerprint());
+    }
+  }
+
+  private void requireNonBlank(Finding finding, String fieldName, String value) {
+    if (value == null || value.isBlank()) {
+      throw new ReportWriteException(
+          "Finding "
+              + finding.id()
+              + " is missing a required field: '"
+              + fieldName
+              + "' must not be blank");
+    }
   }
 }
