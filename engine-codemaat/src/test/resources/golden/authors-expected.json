@@ -6,7 +6,7 @@
     "changeFrequency" : 25.0,
     "engine" : "code-maat"
   },
-  "fingerprint" : "codemaat.knowledge-concentration:src/main/java/com/example/PaymentProcessor.java",
+  "fingerprint" : "4f98bba04e1230bb8996e694e9b3984a24f9b6f97ccc269ca4d2e0a3632df55f",
   "id" : "codemaat.knowledge-concentration:src/main/java/com/example/PaymentProcessor.java",
   "isNew" : false,
   "message" : "src/main/java/com/example/PaymentProcessor.java has been modified by only 1 author(s) across 25 revisions",

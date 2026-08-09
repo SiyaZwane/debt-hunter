@@ -17,6 +17,12 @@
       <groupId>com.debthunter</groupId>
       <artifactId>engine-spi</artifactId>
     </dependency>
+    <!-- RenameTracker: resolves a file's canonical path identity across renames so fingerprints
+         stay stable, using native git's follow-rename log rather than JGit (see RenameTracker's Javadoc). -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>repository</artifactId>
+    </dependency>
     <!-- JGit is a general-purpose library, unrelated to Code Maat: it lets CodeMaatLogWriter
          build the git2-format log Code Maat expects without needing a native git binary. -->
     <dependency>

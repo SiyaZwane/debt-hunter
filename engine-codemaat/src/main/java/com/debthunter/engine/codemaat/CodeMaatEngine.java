@@ -147,7 +147,7 @@ public final class CodeMaatEngine implements AnalysisEngine {
           }
           case OK -> successCount++;
         }
-        collect(analysisType, outcome, findings, metrics);
+        collect(analysisType, outcome, request.repoPath(), findings, metrics);
       }
 
       if (successCount == 0) {
@@ -170,12 +170,15 @@ public final class CodeMaatEngine implements AnalysisEngine {
   private void collect(
       String analysisType,
       AnalysisOutcome outcome,
+      Path repoPath,
       List<Finding> findings,
       Map<String, DebtMetric> metrics) {
     switch (analysisType) {
-      case "revisions" -> findings.addAll(findingMapper.mapRevisions(outcome.revisionsRows()));
-      case "coupling" -> findings.addAll(findingMapper.mapCoupling(outcome.couplingRows()));
-      case "authors" -> findings.addAll(findingMapper.mapAuthors(outcome.authorsRows()));
+      case "revisions" ->
+          findings.addAll(findingMapper.mapRevisions(repoPath, outcome.revisionsRows()));
+      case "coupling" ->
+          findings.addAll(findingMapper.mapCoupling(repoPath, outcome.couplingRows()));
+      case "authors" -> findings.addAll(findingMapper.mapAuthors(repoPath, outcome.authorsRows()));
       case "age" -> metrics.putAll(findingMapper.mapAge(outcome.ageRows()));
       default -> throw new IllegalStateException("Unknown analysis type: " + analysisType);
     }
