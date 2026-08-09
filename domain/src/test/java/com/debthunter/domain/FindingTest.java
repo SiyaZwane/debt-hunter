@@ -94,6 +94,18 @@ class FindingTest {
   }
 
   @Test
+  void withIsNewReturnsACopyWithOnlyIsNewChanged() {
+    Finding original = validBuilder().isNew(false).build();
+
+    Finding copy = original.withIsNew(true);
+
+    assertThat(copy.isNew()).isTrue();
+    assertThat(copy.id()).isEqualTo(original.id());
+    assertThat(copy.fingerprint()).isEqualTo(original.fingerprint());
+    assertThat(copy.evidence()).isEqualTo(original.evidence());
+  }
+
+  @Test
   void evidenceViewExposesTypedAccessors() {
     Finding finding =
         validBuilder().evidence(Map.of("changeFrequency", 12.0, "engine", "code-maat")).build();

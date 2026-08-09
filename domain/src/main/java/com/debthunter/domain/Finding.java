@@ -40,6 +40,28 @@ public record Finding(
   }
 
   /**
+   * Returns a copy of this finding with only {@code isNew} changed, for baseline comparison.
+   *
+   * @param isNew whether this finding is absent from the baseline
+   * @return the copy
+   */
+  public Finding withIsNew(boolean isNew) {
+    return new Finding(
+        id,
+        ruleId,
+        category,
+        severity,
+        confidence,
+        path,
+        startLine,
+        message,
+        evidence,
+        score,
+        isNew,
+        fingerprint);
+  }
+
+  /**
    * Creates a new builder for constructing a {@link Finding}.
    *
    * @return a fresh, empty builder

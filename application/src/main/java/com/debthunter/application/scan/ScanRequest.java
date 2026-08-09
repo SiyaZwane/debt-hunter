@@ -17,7 +17,8 @@ public record ScanRequest(
     List<AnalysisEngine> engines,
     HistoryWindow historyWindow,
     boolean offline,
-    String failOn) {
+    String failOn,
+    Path baselinePath) {
 
   /** Validates required fields and defensively copies {@code engines}. */
   public ScanRequest {

@@ -16,6 +16,8 @@ import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
+import com.debthunter.policy.BaselineComparator;
+import com.debthunter.policy.BaselineResolver;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
 import java.time.Clock;
@@ -72,6 +74,8 @@ class AC03_EngineTimeoutDegradedTest {
             new MarkdownReporter(),
             new MetricsReporter(),
             new SarifReporter(),
+            new BaselineResolver(),
+            new BaselineComparator(),
             "0.1.0-test",
             Duration.ofMillis(150),
             Clock.systemUTC());
@@ -86,6 +90,7 @@ class AC03_EngineTimeoutDegradedTest {
             List.of(timingOutEngine, fastEngine),
             null,
             false,
+            null,
             null);
 
     ScanOutcome outcome = scanUseCase.execute(request);

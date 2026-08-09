@@ -19,6 +19,9 @@ import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.ReportWriteException;
 import com.debthunter.output.SarifReporter;
+import com.debthunter.policy.BaselineComparator;
+import com.debthunter.policy.BaselineResolution;
+import com.debthunter.policy.BaselineResolver;
 import com.debthunter.repository.HistoryWindow;
 import com.debthunter.repository.RepositoryAccessException;
 import com.debthunter.repository.RepositoryHistoryProvider;
@@ -50,6 +53,9 @@ public final class ScanUseCase {
   /** Configuration error: the target path is not usable as given. */
   private static final int EXIT_CONFIGURATION_ERROR = 2;
 
+  /** Baseline error: an explicit or cached baseline was found but cannot be used. */
+  private static final int EXIT_BASELINE_INCOMPATIBLE = 5;
+
   private static final Duration DEFAULT_ENGINE_TIMEOUT = Duration.ofMinutes(5);
 
   private final RepositoryHistoryProvider historyProvider;
@@ -57,6 +63,8 @@ public final class ScanUseCase {
   private final MarkdownReporter markdownReporter;
   private final MetricsReporter metricsReporter;
   private final SarifReporter sarifReporter;
+  private final BaselineResolver baselineResolver;
+  private final BaselineComparator baselineComparator;
   private final String toolVersion;
   private final Duration engineTimeout;
   private final Clock clock;
@@ -69,6 +77,8 @@ public final class ScanUseCase {
    * @param markdownReporter writes {@code summary.md}
    * @param metricsReporter writes {@code metrics.json}
    * @param sarifReporter writes {@code debt-hunter.sarif}
+   * @param baselineResolver resolves the baseline to compare this scan against
+   * @param baselineComparator classifies findings against the resolved baseline
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    */
   public ScanUseCase(
@@ -77,6 +87,8 @@ public final class ScanUseCase {
       MarkdownReporter markdownReporter,
       MetricsReporter metricsReporter,
       SarifReporter sarifReporter,
+      BaselineResolver baselineResolver,
+      BaselineComparator baselineComparator,
       String toolVersion) {
     this(
         historyProvider,
@@ -84,6 +96,8 @@ public final class ScanUseCase {
         markdownReporter,
         metricsReporter,
         sarifReporter,
+        baselineResolver,
+        baselineComparator,
         toolVersion,
         DEFAULT_ENGINE_TIMEOUT,
         Clock.systemUTC());
@@ -97,6 +111,8 @@ public final class ScanUseCase {
    * @param markdownReporter writes {@code summary.md}
    * @param metricsReporter writes {@code metrics.json}
    * @param sarifReporter writes {@code debt-hunter.sarif}
+   * @param baselineResolver resolves the baseline to compare this scan against
+   * @param baselineComparator classifies findings against the resolved baseline
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    * @param engineTimeout the maximum time to wait for any single engine
    * @param clock the clock used for timestamps and duration measurement
@@ -107,6 +123,8 @@ public final class ScanUseCase {
       MarkdownReporter markdownReporter,
       MetricsReporter metricsReporter,
       SarifReporter sarifReporter,
+      BaselineResolver baselineResolver,
+      BaselineComparator baselineComparator,
       String toolVersion,
       Duration engineTimeout,
       Clock clock) {
@@ -115,6 +133,8 @@ public final class ScanUseCase {
     this.markdownReporter = Objects.requireNonNull(markdownReporter, "markdownReporter");
     this.metricsReporter = Objects.requireNonNull(metricsReporter, "metricsReporter");
     this.sarifReporter = Objects.requireNonNull(sarifReporter, "sarifReporter");
+    this.baselineResolver = Objects.requireNonNull(baselineResolver, "baselineResolver");
+    this.baselineComparator = Objects.requireNonNull(baselineComparator, "baselineComparator");
     this.toolVersion = Objects.requireNonNull(toolVersion, "toolVersion");
     this.engineTimeout = Objects.requireNonNull(engineTimeout, "engineTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -148,6 +168,13 @@ public final class ScanUseCase {
   }
 
   private ScanOutcome analyseAndReport(ScanRequest request, RepositoryInfo repoInfo) {
+    BaselineResolution baselineResolution =
+        baselineResolver.resolve(request.baselinePath(), toolVersion);
+    if (baselineResolution.isIncompatible()) {
+      return ScanOutcome.ofError(
+          EXIT_BASELINE_INCOMPATIBLE, baselineResolution.incompatibilityReason());
+    }
+
     HistoryDepth historyDepth = mapHistoryDepth(repoInfo);
     RepositoryContext context =
         new RepositoryContext(request.repoPath(), List.of(), VcsType.GIT, historyDepth);
@@ -190,12 +217,17 @@ public final class ScanUseCase {
             .baseCommit(request.baseRef())
             .historyDepth(historyDepth)
             .engines(engineStatuses)
+            .baselineProvenance(baselineResolution.provenance().name())
             .build();
+
+    BaselineComparator.ComparisonResult comparison =
+        baselineComparator.compare(allFindings, baselineResolution.baseline());
 
     // Policy evaluation is stubbed until FR-08; every scan currently passes.
     PolicyResult policyResult = PolicyResult.passed("unversioned");
 
-    ScanResult scanResult = new ScanResult(run, allFindings, Map.copyOf(allMetrics), policyResult);
+    ScanResult scanResult =
+        new ScanResult(run, comparison.findings(), Map.copyOf(allMetrics), policyResult);
 
     try {
       jsonReporter.write(scanResult, request.outputDir());
