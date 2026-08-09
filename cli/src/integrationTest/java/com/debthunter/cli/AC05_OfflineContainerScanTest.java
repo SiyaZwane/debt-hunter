@@ -7,6 +7,7 @@ import com.debthunter.cli.docker.DockerTestSupport;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
@@ -69,5 +70,6 @@ class AC05_OfflineContainerScanTest {
     assertThat(outputDir.resolve(JsonReporter.FILE_NAME)).exists();
     assertThat(outputDir.resolve(MarkdownReporter.FILE_NAME)).exists();
     assertThat(outputDir.resolve(MetricsReporter.FILE_NAME)).exists();
+    assertThat(outputDir.resolve(SarifReporter.FILE_NAME)).exists();
   }
 }

@@ -21,6 +21,7 @@ import com.debthunter.engine.spi.RepositoryContext;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
+import com.debthunter.output.SarifReporter;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
 import java.nio.file.Path;
@@ -46,6 +47,7 @@ class ScanUseCaseTest {
         new JsonReporter(),
         new MarkdownReporter(),
         new MetricsReporter(),
+        new SarifReporter(),
         "0.1.0-test",
         timeout,
         Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
