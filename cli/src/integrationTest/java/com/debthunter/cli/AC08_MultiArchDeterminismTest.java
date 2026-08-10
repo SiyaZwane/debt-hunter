@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import com.debthunter.cli.docker.DockerTestSupport;
 import com.debthunter.output.JsonReporter;
 import com.debthunter.testkit.FixtureRepoBuilder;
+import com.debthunter.testkit.VolatileFieldMasker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
@@ -72,8 +72,8 @@ class AC08_MultiArchDeterminismTest {
     JsonNode amd64Result = scanWith(AMD64_TAG, fixtureDir, workDir.resolve("amd64-output"));
     JsonNode arm64Result = scanWith(ARM64_TAG, fixtureDir, workDir.resolve("arm64-output"));
 
-    stripVolatileRunFields(amd64Result);
-    stripVolatileRunFields(arm64Result);
+    VolatileFieldMasker.mask(amd64Result);
+    VolatileFieldMasker.mask(arm64Result);
     assertThat(amd64Result).isEqualTo(arm64Result);
   }
 
@@ -96,11 +96,5 @@ class AC08_MultiArchDeterminismTest {
             "/output");
     assertThat(result.exitCode()).isIn(0, 1);
     return new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
-  }
-
-  private void stripVolatileRunFields(JsonNode root) {
-    ObjectNode run = (ObjectNode) root.get("run");
-    run.remove("id");
-    run.remove("timestamp");
   }
 }

@@ -42,12 +42,17 @@ public final class DebtHunterCli implements Runnable {
   }
 
   /**
-   * Process entry point: delegates to {@link #execute(String[])} and translates the result into a
-   * process exit code.
+   * Process entry point: forces a deterministic time zone and locale, delegates to {@link
+   * #execute(String[])}, and translates the result into a process exit code.
+   *
+   * <p>Enforcement happens here rather than in {@link #execute(String[])} deliberately: {@link
+   * #execute(String[])} is what tests call directly, and AC-14's cross-platform determinism test
+   * relies on being able to set the JVM's default time zone and locale itself before invoking it.
    *
    * @param args raw command-line arguments
    */
   public static void main(String[] args) {
+    DeterminismEnforcer.enforce();
     System.exit(execute(args));
   }
 }

@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.debthunter.output.JsonReporter;
 import com.debthunter.testkit.FixtureRepoBuilder;
+import com.debthunter.testkit.VolatileFieldMasker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -72,8 +72,8 @@ class AC14_CrossPlatformDeterminismTest {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode jsonA = mapper.readTree(outputDirA.resolve(JsonReporter.FILE_NAME).toFile());
     JsonNode jsonB = mapper.readTree(outputDirB.resolve(JsonReporter.FILE_NAME).toFile());
-    stripVolatileRunFields(jsonA);
-    stripVolatileRunFields(jsonB);
+    VolatileFieldMasker.mask(jsonA);
+    VolatileFieldMasker.mask(jsonB);
 
     assertThat(jsonA).isEqualTo(jsonB);
   }
@@ -81,11 +81,5 @@ class AC14_CrossPlatformDeterminismTest {
   private int runScan(Path outputDir) {
     return new CommandLine(new DebtHunterCli())
         .execute("scan", "--repo", fixture.path().toString(), "--output-dir", outputDir.toString());
-  }
-
-  private void stripVolatileRunFields(JsonNode root) {
-    ObjectNode run = (ObjectNode) root.get("run");
-    run.remove("id");
-    run.remove("timestamp");
   }
 }

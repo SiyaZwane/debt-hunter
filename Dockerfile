@@ -34,6 +34,11 @@ RUN apt-get update \
 RUN groupadd --gid 10001 debt-hunter \
     && useradd --uid 10001 --gid debt-hunter --shell /usr/sbin/nologin --no-create-home debt-hunter
 
+# Defence in depth for deterministic output: DeterminismEnforcer forces the same outcome inside
+# the JVM regardless of these, but setting them here means any other process in the container
+# (git itself, a future non-JVM engine adapter) inherits the same fixed time zone and locale.
+ENV TZ=UTC LC_ALL=C
+
 COPY --from=jlink /opt/jre-minimal /opt/debt-hunter/jre
 COPY --from=build /workspace/cli/target/debt-hunter.jar /opt/debt-hunter/debt-hunter.jar
 COPY docker/debt-hunter /usr/local/bin/debt-hunter

@@ -40,4 +40,21 @@
       <artifactId>junit-jupiter</artifactId>
     </dependency>
   </dependencies>
+
+  <build>
+    <plugins>
+      <!-- FixtureRepoCli.main() is a process-boundary entry point for shell scripts, the same
+           kind of unavoidable glue DebtHunterCli.main() is; excluded from the coverage gate for
+           the same reason. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/FixtureRepoCli.class</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
