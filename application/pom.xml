@@ -33,6 +33,11 @@
       <groupId>com.debthunter</groupId>
       <artifactId>output</artifactId>
     </dependency>
+    <!-- PublishUseCase delegates to a ResultUploader for optional, fire-and-forget publication. -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>integration</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>

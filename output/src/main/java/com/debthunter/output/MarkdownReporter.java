@@ -37,6 +37,26 @@ public final class MarkdownReporter {
   }
 
   /**
+   * Appends a publish-failure warning to a previously written {@value #FILE_NAME}. Publication
+   * happens after every report is already written (it runs after policy evaluation, orchestrated by
+   * the CLI layer, not this reporter's own {@link #write}), so this is a deliberate append to an
+   * existing file rather than something folded into {@link #render}.
+   *
+   * @param outputDir the directory {@value #FILE_NAME} was already written into
+   * @param reason why publication failed
+   * @throws ReportWriteException if the file cannot be appended to
+   */
+  public void appendPublishFailureWarning(Path outputDir, String reason) {
+    Path target = outputDir.resolve(FILE_NAME);
+    String warning = "\n> **Warning:** failed to publish scan result: " + reason + "\n";
+    try {
+      Files.writeString(target, warning, java.nio.file.StandardOpenOption.APPEND);
+    } catch (IOException e) {
+      throw new ReportWriteException("Failed to append publish warning to " + target, e);
+    }
+  }
+
+  /**
    * Renders the Markdown summary for {@code scanResult} without writing it to disk.
    *
    * @param scanResult the result to summarise

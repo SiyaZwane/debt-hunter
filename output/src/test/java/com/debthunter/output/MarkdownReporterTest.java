@@ -84,6 +84,19 @@ class MarkdownReporterTest {
   }
 
   @Test
+  void appendsAPublishFailureWarningToAnAlreadyWrittenFile(@TempDir Path outputDir)
+      throws IOException {
+    Path written = reporter.write(scanResultWith(List.of(), List.of()), outputDir);
+    String before = Files.readString(written);
+
+    reporter.appendPublishFailureWarning(outputDir, "connection refused");
+
+    String after = Files.readString(written);
+    assertThat(after).startsWith(before);
+    assertThat(after).contains("**Warning:** failed to publish scan result: connection refused");
+  }
+
+  @Test
   void rendersNoHistoryWarningWhenHistoryIsFull() {
     ScanResult scanResult = scanResultWith(List.of(), List.of(), HistoryDepth.FULL);
 
