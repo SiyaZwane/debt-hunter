@@ -5,9 +5,12 @@ import com.debthunter.domain.PolicyResult;
 import com.debthunter.domain.PolicyStatus;
 import com.debthunter.domain.PolicyViolation;
 import com.debthunter.domain.Severity;
+import com.debthunter.domain.SuppressionEntry;
 import com.debthunter.engine.spi.AnalysisMode;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Evaluates a policy bundle's thresholds against a scan's new findings.
@@ -30,7 +33,7 @@ public final class PolicyEvaluator {
    *     violated rule
    */
   public PolicyResult evaluate(List<Finding> findings, PolicyBundle bundle, AnalysisMode mode) {
-    return evaluate(findings, bundle, mode, null);
+    return evaluate(findings, bundle, mode, null, List.of());
   }
 
   /**
@@ -51,7 +54,32 @@ public final class PolicyEvaluator {
    */
   public PolicyResult evaluate(
       List<Finding> findings, PolicyBundle bundle, AnalysisMode mode, Severity failOn) {
-    List<Finding> eligible = eligibleFindings(findings, bundle);
+    return evaluate(findings, bundle, mode, failOn, List.of());
+  }
+
+  /**
+   * Evaluates {@code findings} against {@code bundle}'s rule set for {@code mode}, plus an
+   * additional, ad hoc {@code failOn} threshold, excluding any finding covered by an active
+   * suppression from every rule — including {@code failOn}. A suppressed finding still appears in
+   * the scan's own findings list; it simply never counts toward a threshold.
+   *
+   * @param findings this scan's findings, with {@link Finding#isNew()} already set
+   * @param bundle the policy bundle to evaluate against
+   * @param mode which rule set applies: {@link AnalysisMode#PULL_REQUEST} or {@link
+   *     AnalysisMode#FULL}
+   * @param failOn the {@code --fail-on} override, or {@code null} if none was given
+   * @param activeSuppressions suppressions currently in effect (already filtered to those not yet
+   *     expired); a finding whose fingerprint matches one is excluded from every threshold
+   * @return {@link PolicyStatus#PASSED} with no reasons, or {@link PolicyStatus#FAILED} with every
+   *     violated rule, including a {@code fail-on} violation if {@code failOn} applies
+   */
+  public PolicyResult evaluate(
+      List<Finding> findings,
+      PolicyBundle bundle,
+      AnalysisMode mode,
+      Severity failOn,
+      List<SuppressionEntry> activeSuppressions) {
+    List<Finding> eligible = eligibleFindings(findings, bundle, activeSuppressions);
 
     List<PolicyViolation> violations = new ArrayList<>();
     for (PolicyRule rule : bundle.rulesFor(mode)) {
@@ -85,8 +113,17 @@ public final class PolicyEvaluator {
     return new PolicyResult(bundle.version(), status, violations);
   }
 
-  private List<Finding> eligibleFindings(List<Finding> findings, PolicyBundle bundle) {
-    return findings.stream().filter(Finding::isNew).filter(f -> !isExcluded(f, bundle)).toList();
+  private List<Finding> eligibleFindings(
+      List<Finding> findings, PolicyBundle bundle, List<SuppressionEntry> activeSuppressions) {
+    Set<String> suppressedFingerprints = new HashSet<>();
+    for (SuppressionEntry suppression : activeSuppressions) {
+      suppressedFingerprints.add(suppression.fingerprint());
+    }
+    return findings.stream()
+        .filter(Finding::isNew)
+        .filter(f -> !isExcluded(f, bundle))
+        .filter(f -> !suppressedFingerprints.contains(f.fingerprint()))
+        .toList();
   }
 
   private List<Finding> atOrAboveSeverity(List<Finding> findings, Severity minSeverity) {

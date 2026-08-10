@@ -12,6 +12,7 @@ import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
 /** JGit-backed implementation of {@link RepositoryHistoryProvider}. */
@@ -33,9 +34,17 @@ public final class GitHistoryProvider implements RepositoryHistoryProvider {
           isGrafted(repository),
           commitCount,
           head == null ? null : head.getName(),
-          repository.getBranch());
+          repository.getBranch(),
+          head == null ? null : headCommitDate(repository, head));
     } catch (IOException e) {
       throw new RepositoryAccessException("Failed to inspect repository at " + repoPath, e);
+    }
+  }
+
+  private Instant headCommitDate(Repository repository, ObjectId head) throws IOException {
+    try (RevWalk revWalk = new RevWalk(repository)) {
+      RevCommit commit = revWalk.parseCommit(head);
+      return Instant.ofEpochSecond(commit.getCommitTime());
     }
   }
 

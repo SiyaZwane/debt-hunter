@@ -5,10 +5,12 @@ import com.debthunter.domain.Finding;
 import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.ScanResult;
 import com.debthunter.domain.Severity;
+import com.debthunter.domain.SuppressionEntry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -26,10 +28,25 @@ public final class MarkdownReporter {
    * @return the path of the file written
    */
   public Path write(ScanResult scanResult, Path outputDir) {
+    return write(scanResult, outputDir, List.of());
+  }
+
+  /**
+   * Writes {@code scanResult} as {@value #FILE_NAME} under {@code outputDir}, listing {@code
+   * activeSuppressions} in a dedicated section.
+   *
+   * @param scanResult the result to summarise
+   * @param outputDir the directory to write into; created if it does not exist
+   * @param activeSuppressions suppressions currently in effect (already filtered to those not yet
+   *     expired)
+   * @return the path of the file written
+   */
+  public Path write(
+      ScanResult scanResult, Path outputDir, List<SuppressionEntry> activeSuppressions) {
     Path target = outputDir.resolve(FILE_NAME);
     try {
       Files.createDirectories(outputDir);
-      Files.writeString(target, render(scanResult));
+      Files.writeString(target, render(scanResult, activeSuppressions));
       return target;
     } catch (IOException e) {
       throw new ReportWriteException("Failed to write " + target, e);
@@ -63,6 +80,19 @@ public final class MarkdownReporter {
    * @return the rendered Markdown document
    */
   public String render(ScanResult scanResult) {
+    return render(scanResult, List.of());
+  }
+
+  /**
+   * Renders the Markdown summary for {@code scanResult}, including {@code activeSuppressions},
+   * without writing it to disk.
+   *
+   * @param scanResult the result to summarise
+   * @param activeSuppressions suppressions currently in effect (already filtered to those not yet
+   *     expired)
+   * @return the rendered Markdown document
+   */
+  public String render(ScanResult scanResult, List<SuppressionEntry> activeSuppressions) {
     StringBuilder markdown = new StringBuilder();
     markdown.append("# Debt Hunter Summary\n\n");
     markdown.append("**Verdict:** ").append(scanResult.policy().status()).append("\n\n");
@@ -76,6 +106,7 @@ public final class MarkdownReporter {
     appendHistoryWarning(markdown, scanResult.run().historyDepth());
     appendEngineStatuses(markdown, scanResult.run().engines());
     appendFindings(markdown, scanResult.findings());
+    appendActiveSuppressions(markdown, activeSuppressions);
 
     return markdown.toString();
   }
@@ -117,7 +148,7 @@ public final class MarkdownReporter {
   private void appendFindings(StringBuilder markdown, java.util.List<Finding> findings) {
     markdown.append("## Findings (").append(findings.size()).append(")\n\n");
     if (findings.isEmpty()) {
-      markdown.append("No findings.\n");
+      markdown.append("No findings.\n\n");
       return;
     }
     Map<Severity, Long> countsBySeverity =
@@ -130,6 +161,28 @@ public final class MarkdownReporter {
       if (count > 0) {
         markdown.append("- ").append(severity).append(": ").append(count).append("\n");
       }
+    }
+    markdown.append("\n");
+  }
+
+  private void appendActiveSuppressions(
+      StringBuilder markdown, List<SuppressionEntry> activeSuppressions) {
+    markdown.append("## Active suppressions (").append(activeSuppressions.size()).append(")\n\n");
+    if (activeSuppressions.isEmpty()) {
+      markdown.append("No active suppressions.\n");
+      return;
+    }
+    for (SuppressionEntry suppression : activeSuppressions) {
+      markdown
+          .append("- `")
+          .append(suppression.fingerprint())
+          .append("` — owner: ")
+          .append(suppression.owner())
+          .append(", expires: ")
+          .append(suppression.expiresOn())
+          .append(", reason: ")
+          .append(suppression.reason())
+          .append("\n");
     }
   }
 }
