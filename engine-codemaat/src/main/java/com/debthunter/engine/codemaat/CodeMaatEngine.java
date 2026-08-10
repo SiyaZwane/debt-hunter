@@ -123,7 +123,7 @@ public final class CodeMaatEngine implements AnalysisEngine {
     Path logFile;
     try {
       logFile = Files.createTempFile("debt-hunter-codemaat-", ".log");
-      logWriter.writeLog(request.repoPath(), logFile);
+      logWriter.writeLog(request.repoPath(), logFile, request.historyWindowSince());
     } catch (RuntimeException | IOException e) {
       return EngineResult.failed(
           "Failed to build Code Maat log: " + e.getMessage(), elapsed(start));
