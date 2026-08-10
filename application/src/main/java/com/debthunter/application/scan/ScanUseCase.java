@@ -28,15 +28,14 @@ import com.debthunter.policy.BaselineResolution;
 import com.debthunter.policy.BaselineResolver;
 import com.debthunter.policy.PolicyBundle;
 import com.debthunter.policy.PolicyBundleParser;
+import com.debthunter.policy.PolicyComposer;
 import com.debthunter.policy.PolicyEvaluator;
+import com.debthunter.policy.PolicyLoosenedException;
 import com.debthunter.policy.PolicyParseException;
 import com.debthunter.repository.HistoryWindow;
 import com.debthunter.repository.RepositoryAccessException;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -79,6 +78,9 @@ public final class ScanUseCase {
   private final String toolVersion;
   private final Duration engineTimeout;
   private final Clock clock;
+  // Composed from policyBundleParser above rather than added as its own constructor parameter,
+  // for the same reason as projectSlicer: no test call site needs to substitute a fake one.
+  private final PolicyComposer policyComposer;
 
   /**
    * Creates a use case with the default 5-minute per-engine timeout and system clock.
@@ -168,6 +170,7 @@ public final class ScanUseCase {
     this.toolVersion = Objects.requireNonNull(toolVersion, "toolVersion");
     this.engineTimeout = Objects.requireNonNull(engineTimeout, "engineTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
+    this.policyComposer = new PolicyComposer(this.policyBundleParser);
   }
 
   /**
@@ -204,8 +207,9 @@ public final class ScanUseCase {
   private ScanOutcome analyseAndReport(ScanRequest request, RepositoryInfo repoInfo) {
     PolicyBundle policyBundle;
     try {
-      policyBundle = loadPolicyBundle(request.policyPath());
-    } catch (PolicyParseException e) {
+      PolicyBundle central = policyBundleParser.loadCentral(request.policyPath());
+      policyBundle = policyComposer.compose(request.repoPath(), central).bundle();
+    } catch (PolicyParseException | PolicyLoosenedException e) {
       return ScanOutcome.ofError(
           ExitCode.CONFIGURATION_ERROR.code(), "Invalid policy: " + e.getMessage());
     }
@@ -369,24 +373,6 @@ public final class ScanUseCase {
           evaluated.bundleVersion(), PolicyStatus.WOULD_FAIL, evaluated.reasons());
     }
     return evaluated;
-  }
-
-  /**
-   * Loads and parses the policy bundle at {@code policyPath}, or {@link PolicyBundle#permissive()}
-   * if none was configured.
-   */
-  private PolicyBundle loadPolicyBundle(Path policyPath) {
-    if (policyPath == null) {
-      return PolicyBundle.permissive();
-    }
-    String yaml;
-    try {
-      yaml = Files.readString(policyPath);
-    } catch (IOException e) {
-      throw new PolicyParseException(
-          "Could not read policy file " + policyPath + ": " + e.getMessage(), e);
-    }
-    return policyBundleParser.parse(yaml);
   }
 
   private EngineResult runWithTimeout(

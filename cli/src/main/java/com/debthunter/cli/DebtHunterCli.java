@@ -18,7 +18,8 @@ import picocli.CommandLine.Command;
       ScanCommand.class,
       DoctorCommand.class,
       PublishCommand.class,
-      ExplainCommand.class
+      ExplainCommand.class,
+      PolicyCommand.class
     })
 public final class DebtHunterCli implements Runnable {
 

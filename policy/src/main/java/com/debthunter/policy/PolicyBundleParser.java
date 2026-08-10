@@ -3,6 +3,9 @@ package com.debthunter.policy;
 import com.debthunter.domain.Category;
 import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.Severity;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +64,28 @@ public final class PolicyBundleParser {
       throw new PolicyParseException("Policy bundle must be a YAML mapping at the top level");
     }
     return build(asStringKeyedMap(rawRoot, "<root>"));
+  }
+
+  /**
+   * Loads and parses the central policy bundle at {@code policyPath}, or {@link
+   * PolicyBundle#permissive()} if none was configured.
+   *
+   * @param policyPath path to a policy bundle YAML file, or {@code null} if none is configured
+   * @return the parsed bundle, or the permissive default
+   * @throws PolicyParseException if {@code policyPath} is set but cannot be read or parsed
+   */
+  public PolicyBundle loadCentral(Path policyPath) {
+    if (policyPath == null) {
+      return PolicyBundle.permissive();
+    }
+    String yaml;
+    try {
+      yaml = Files.readString(policyPath);
+    } catch (IOException e) {
+      throw new PolicyParseException(
+          "Could not read policy file " + policyPath + ": " + e.getMessage(), e);
+    }
+    return parse(yaml);
   }
 
   private PolicyBundle build(Map<String, Object> root) {
