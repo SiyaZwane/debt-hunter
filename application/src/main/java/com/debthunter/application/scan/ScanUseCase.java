@@ -285,7 +285,8 @@ public final class ScanUseCase {
         sliceByProject
             ? evaluatePerProject(findingsByProject, policyBundle, request, baselineResolution)
             : applyObserveMode(
-                policyEvaluator.evaluate(comparison.findings(), policyBundle, request.mode()),
+                policyEvaluator.evaluate(
+                    comparison.findings(), policyBundle, request.mode(), request.failOn()),
                 baselineResolution);
     int exitCode =
         policyResult.status() == PolicyStatus.FAILED
@@ -335,7 +336,8 @@ public final class ScanUseCase {
     for (Map.Entry<String, List<Finding>> entry : findingsByProject.entrySet()) {
       PolicyResult perProject =
           applyObserveMode(
-              policyEvaluator.evaluate(entry.getValue(), policyBundle, request.mode()),
+              policyEvaluator.evaluate(
+                  entry.getValue(), policyBundle, request.mode(), request.failOn()),
               baselineResolution);
       anyFailed |= perProject.status() == PolicyStatus.FAILED;
       anyWouldFail |= perProject.status() == PolicyStatus.WOULD_FAIL;

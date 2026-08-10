@@ -158,6 +158,100 @@ class PolicyEvaluatorTest {
     assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
   }
 
+  @Test
+  void withNoFailOnOverrideAPermissiveBundlePasses() {
+    var result =
+        evaluator.evaluate(
+            List.of(finding("f-1", Severity.CRITICAL, true)),
+            PolicyBundle.permissive(),
+            AnalysisMode.FULL,
+            null);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aFailOnOverrideFailsAPermissiveBundleThatWouldOtherwisePass() {
+    Finding high = finding("f-1", Severity.HIGH, true);
+
+    var result =
+        evaluator.evaluate(
+            List.of(high), PolicyBundle.permissive(), AnalysisMode.FULL, Severity.HIGH);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.FAILED);
+    assertThat(result.reasons()).hasSize(1);
+    assertThat(result.reasons().get(0).rule()).isEqualTo("fail-on:HIGH");
+    assertThat(result.reasons().get(0).findingIds()).containsExactly("f-1");
+  }
+
+  @Test
+  void aFailOnOverrideDoesNotTriggerBelowItsSeverity() {
+    Finding low = finding("f-1", Severity.LOW, true);
+
+    var result =
+        evaluator.evaluate(
+            List.of(low), PolicyBundle.permissive(), AnalysisMode.FULL, Severity.HIGH);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aFailOnOverrideNeverCountsAnExistingNonNewFinding() {
+    Finding existingHigh = finding("f-1", Severity.HIGH, false);
+
+    var result =
+        evaluator.evaluate(
+            List.of(existingHigh), PolicyBundle.permissive(), AnalysisMode.FULL, Severity.HIGH);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aFailOnOverrideNeverCountsAnExcludedFinding() {
+    PolicyBundle base = PolicyBundle.permissive();
+    PolicyBundle bundle =
+        new PolicyBundle(
+            base.version(),
+            base.metadata(),
+            base.minimumHistoryDepth(),
+            base.mainRules(),
+            base.pullRequestRules(),
+            List.of(Category.HOTSPOT),
+            base.excludedPaths(),
+            base.suppressionsMaxExpiryDays());
+    Finding excludedHotspot =
+        Finding.builder()
+            .id("f-1")
+            .ruleId("hotspot.rule")
+            .category(Category.HOTSPOT)
+            .severity(Severity.CRITICAL)
+            .path("Foo.java")
+            .message("msg")
+            .fingerprint("fp-f-1")
+            .isNew(true)
+            .build();
+
+    var result =
+        evaluator.evaluate(List.of(excludedHotspot), bundle, AnalysisMode.FULL, Severity.CRITICAL);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aFailOnOverrideAddsToRatherThanReplacesTheBundlesOwnViolations() {
+    PolicyBundle bundle = bundleWithMainRule("no-critical", Severity.CRITICAL, 0);
+    Finding critical = finding("f-1", Severity.CRITICAL, true);
+    Finding high = finding("f-2", Severity.HIGH, true);
+
+    var result =
+        evaluator.evaluate(List.of(critical, high), bundle, AnalysisMode.FULL, Severity.HIGH);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.FAILED);
+    assertThat(result.reasons()).hasSize(2);
+    assertThat(result.reasons().stream().map(v -> v.rule()).toList())
+        .containsExactlyInAnyOrder("no-critical", "fail-on:HIGH");
+  }
+
   private PolicyBundle bundleWithMainRule(String id, Severity severity, int maxCount) {
     return new PolicyBundle(
         "1.0",
