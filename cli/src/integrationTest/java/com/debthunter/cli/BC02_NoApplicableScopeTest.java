@@ -18,6 +18,8 @@ import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
 import com.debthunter.policy.BaselineComparator;
 import com.debthunter.policy.BaselineResolver;
+import com.debthunter.policy.PolicyBundleParser;
+import com.debthunter.policy.PolicyEvaluator;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import java.nio.file.Path;
@@ -58,6 +60,8 @@ class BC02_NoApplicableScopeTest {
             new SarifReporter(),
             new BaselineResolver(),
             new BaselineComparator(),
+            new PolicyBundleParser(),
+            new PolicyEvaluator(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(outOfScopeEngine));

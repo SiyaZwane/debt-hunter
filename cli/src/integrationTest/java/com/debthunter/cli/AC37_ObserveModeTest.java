@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.scan.ExitCode;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.domain.Category;
 import com.debthunter.domain.Finding;
@@ -26,6 +27,7 @@ import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -34,12 +36,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * AC-30: with no explicit baseline and nothing at the pipeline-cache path, a scan still completes
- * normally — {@code baselineProvenance} records {@code NONE}, and every finding compares as new,
- * since there is nothing to compare against.
+ * AC-37: with no baseline configured, a rule that would otherwise fail the scan instead reports
+ * {@code would_fail} and exits 0 — a first-ever scan observes rather than blocks.
  */
 @Tag("integration")
-class AC30_NoBaselineObserveModeTest {
+class AC37_ObserveModeTest {
 
   private FixtureRepoBuilder fixture;
 
@@ -51,9 +52,22 @@ class AC30_NoBaselineObserveModeTest {
   }
 
   @Test
-  void ac30_noBaselineAnywhereCompletesNormallyWithEveryFindingMarkedNew(@TempDir Path outputDir)
-      throws Exception {
+  void ac37_aViolatedRuleWithNoBaselineObservesInsteadOfFailing(
+      @TempDir Path outputDir, @TempDir Path workDir) throws Exception {
     fixture = FixtureRepoBuilder.init().commitFile("Foo.java", "class Foo {}", "add Foo");
+
+    Path policyPath = workDir.resolve("policy.yml");
+    Files.writeString(
+        policyPath,
+        """
+        version: "1.0"
+        policy:
+          main:
+            rules:
+              - id: no-new-critical
+                severity: CRITICAL
+                maxCount: 0
+        """);
 
     AnalysisEngine engine = mock(AnalysisEngine.class);
     when(engine.descriptor())
@@ -67,9 +81,9 @@ class AC30_NoBaselineObserveModeTest {
                         .id("f-1")
                         .ruleId("hotspot.rule")
                         .category(Category.HOTSPOT)
-                        .severity(Severity.HIGH)
+                        .severity(Severity.CRITICAL)
                         .path("Foo.java")
-                        .message("Foo.java changes often")
+                        .message("Foo.java is critically overdue")
                         .fingerprint("fp-f-1")
                         .build()),
                 List.of(),
@@ -88,15 +102,14 @@ class AC30_NoBaselineObserveModeTest {
             new PolicyEvaluator(),
             "0.1.0-test");
     ScanCommand command =
-        new ScanCommand(fixture.path(), outputDir, null, scanUseCase, List.of(engine));
+        new ScanCommand(fixture.path(), outputDir, policyPath, null, scanUseCase, List.of(engine));
 
     int exitCode = command.call();
 
-    assertThat(exitCode).isIn(0, 1);
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode root = mapper.readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
+    assertThat(exitCode).isEqualTo(ExitCode.POLICY_SATISFIED.code());
+    JsonNode root = new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
+    assertThat(root.get("policy").get("status").asText()).isEqualTo("WOULD_FAIL");
+    assertThat(root.get("policy").get("reasons")).hasSize(1);
     assertThat(root.get("run").get("baselineProvenance").asText()).isEqualTo("NONE");
-    assertThat(root.get("findings")).hasSize(1);
-    assertThat(root.get("findings").get(0).get("isNew").asBoolean()).isTrue();
   }
 }

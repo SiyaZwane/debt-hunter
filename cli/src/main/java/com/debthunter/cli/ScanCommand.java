@@ -11,6 +11,8 @@ import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
 import com.debthunter.policy.BaselineComparator;
 import com.debthunter.policy.BaselineResolver;
+import com.debthunter.policy.PolicyBundleParser;
+import com.debthunter.policy.PolicyEvaluator;
 import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.repository.HistoryWindow;
 import java.nio.file.Path;
@@ -98,8 +100,30 @@ public final class ScanCommand implements Callable<Integer> {
       Path baselinePath,
       ScanUseCase scanUseCase,
       List<AnalysisEngine> engines) {
+    this(repoPath, outputDir, null, baselinePath, scanUseCase, engines);
+  }
+
+  /**
+   * Constructs the command with explicit collaborators, target paths, a policy path, and a baseline
+   * path, bypassing picocli option parsing entirely, for testing.
+   *
+   * @param repoPath repository path to scan; defaults to {@code "."} if {@code null}
+   * @param outputDir directory to write report files into
+   * @param policyPath path to a policy bundle file, or {@code null}
+   * @param baselinePath path to a baseline artefact to compare against, or {@code null}
+   * @param scanUseCase the use case to delegate to
+   * @param engines the analysis engines to run
+   */
+  ScanCommand(
+      Path repoPath,
+      Path outputDir,
+      Path policyPath,
+      Path baselinePath,
+      ScanUseCase scanUseCase,
+      List<AnalysisEngine> engines) {
     this.repoPath = repoPath == null ? Path.of(".") : repoPath;
     this.outputDir = outputDir;
+    this.policyPath = policyPath;
     this.baselinePath = baselinePath;
     this.scanUseCase = scanUseCase;
     this.engines = engines;
@@ -114,6 +138,8 @@ public final class ScanCommand implements Callable<Integer> {
         new SarifReporter(),
         new BaselineResolver(),
         new BaselineComparator(),
+        new PolicyBundleParser(),
+        new PolicyEvaluator(),
         TOOL_VERSION);
   }
 

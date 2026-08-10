@@ -17,6 +17,8 @@ import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
 import com.debthunter.policy.BaselineComparator;
 import com.debthunter.policy.BaselineResolver;
+import com.debthunter.policy.PolicyBundleParser;
+import com.debthunter.policy.PolicyEvaluator;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
 import java.nio.file.Path;
@@ -46,6 +48,8 @@ class BC04_AllEnginesFailTest {
             new SarifReporter(),
             new BaselineResolver(),
             new BaselineComparator(),
+            new PolicyBundleParser(),
+            new PolicyEvaluator(),
             "0.1.0-test");
 
     ScanRequest request =

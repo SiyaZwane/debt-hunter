@@ -17,6 +17,11 @@
       <groupId>com.debthunter</groupId>
       <artifactId>domain</artifactId>
     </dependency>
+    <!-- PolicyEvaluator selects a rule set by AnalysisMode (FULL vs PULL_REQUEST). -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>engine-spi</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.yaml</groupId>
       <artifactId>snakeyaml</artifactId>
