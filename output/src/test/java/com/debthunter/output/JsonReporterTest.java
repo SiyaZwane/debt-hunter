@@ -112,6 +112,24 @@ class JsonReporterTest {
     assertThat(content.indexOf("\"alpha\"")).isLessThan(content.indexOf("\"zebra\""));
   }
 
+  @Test
+  void readReturnsAScanResultEquivalentToWhatWasWritten(@TempDir Path outputDir) {
+    ScanResult original = sampleScanResult(List.of(finding("rule", "a.java", 1)));
+    Path written = reporter.write(original, outputDir);
+
+    ScanResult readBack = reporter.read(written);
+
+    assertThat(readBack.findings()).isEqualTo(original.findings());
+    assertThat(readBack.run().id()).isEqualTo(original.run().id());
+    assertThat(readBack.policy().status()).isEqualTo(original.policy().status());
+  }
+
+  @Test
+  void readOfAMissingFileThrowsAReportReadException(@TempDir Path outputDir) {
+    assertThatThrownBy(() -> reporter.read(outputDir.resolve("missing.json")))
+        .isInstanceOf(ReportReadException.class);
+  }
+
   private ScanResult sampleScanResult(List<Finding> findings) {
     return new ScanResult(
         sampleRun(List.of()), findings, Map.of(), PolicyResult.passed("bundle-1"));

@@ -2,6 +2,7 @@ package com.debthunter.output;
 
 import com.debthunter.domain.Finding;
 import com.debthunter.domain.ScanResult;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -53,6 +54,25 @@ public final class JsonReporter {
       return target;
     } catch (IOException e) {
       throw new ReportWriteException("Failed to write " + target, e);
+    }
+  }
+
+  /**
+   * Reads a previously written {@value #FILE_NAME} back into a {@link ScanResult}. The envelope's
+   * {@code schemaVersion} field has no corresponding {@link ScanResult} component; deserialisation
+   * simply ignores it rather than requiring a matching wrapper type.
+   *
+   * @param reportFile the report file to read
+   * @return the result it contains
+   * @throws ReportReadException if the file cannot be read or does not parse as a scan result
+   */
+  public ScanResult read(Path reportFile) {
+    try {
+      ObjectMapper reader =
+          objectMapper.copy().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+      return reader.readValue(reportFile.toFile(), ScanResult.class);
+    } catch (IOException e) {
+      throw new ReportReadException("Failed to read " + reportFile, e);
     }
   }
 

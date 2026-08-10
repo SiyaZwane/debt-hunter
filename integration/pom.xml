@@ -17,6 +17,12 @@
       <groupId>com.debthunter</groupId>
       <artifactId>domain</artifactId>
     </dependency>
+    <!-- Reuses DeterministicObjectMapper and JsonReport so a published result is byte-for-byte
+         the same JSON shape debt-hunter.json already writes. -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>output</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
