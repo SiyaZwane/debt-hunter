@@ -7,7 +7,11 @@ import com.debthunter.domain.Category;
 import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.Severity;
 import com.debthunter.engine.spi.AnalysisMode;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class PolicyBundleParserTest {
 
@@ -185,5 +189,42 @@ class PolicyBundleParserTest {
   @Test
   void anEmptyDocumentIsRejected() {
     assertThatThrownBy(() -> parser.parse("")).isInstanceOf(PolicyParseException.class);
+  }
+
+  @Test
+  void loadCentralReturnsThePermissiveBundleWhenNoPathIsConfigured() {
+    PolicyBundle bundle = parser.loadCentral(null);
+
+    assertThat(bundle).isEqualTo(PolicyBundle.permissive());
+  }
+
+  @Test
+  void loadCentralReadsAndParsesTheFileAtThatPath(@TempDir Path dir) throws IOException {
+    Path policyFile = dir.resolve("policy.yml");
+    Files.writeString(
+        policyFile,
+        """
+        version: "1.0"
+        policy:
+          main:
+            rules:
+              - id: no-critical
+                severity: CRITICAL
+                maxCount: 0
+        """);
+
+    PolicyBundle bundle = parser.loadCentral(policyFile);
+
+    assertThat(bundle.mainRules())
+        .containsExactly(new PolicyRule("no-critical", Severity.CRITICAL, 0));
+  }
+
+  @Test
+  void loadCentralWrapsAnUnreadableFileInAPolicyParseException(@TempDir Path dir) {
+    Path missing = dir.resolve("missing.yml");
+
+    assertThatThrownBy(() -> parser.loadCentral(missing))
+        .isInstanceOf(PolicyParseException.class)
+        .hasMessageContaining("missing.yml");
   }
 }
