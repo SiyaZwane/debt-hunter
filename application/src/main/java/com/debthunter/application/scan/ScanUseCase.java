@@ -20,12 +20,20 @@ import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.ReportWriteException;
 import com.debthunter.output.SarifReporter;
 import com.debthunter.policy.BaselineComparator;
+import com.debthunter.policy.BaselineProvenance;
 import com.debthunter.policy.BaselineResolution;
 import com.debthunter.policy.BaselineResolver;
+import com.debthunter.policy.PolicyBundle;
+import com.debthunter.policy.PolicyBundleParser;
+import com.debthunter.policy.PolicyEvaluator;
+import com.debthunter.policy.PolicyParseException;
 import com.debthunter.repository.HistoryWindow;
 import com.debthunter.repository.RepositoryAccessException;
 import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -47,15 +55,6 @@ import java.util.concurrent.TimeoutException;
  */
 public final class ScanUseCase {
 
-  /** Internal error: something failed that the caller cannot fix by changing their input. */
-  private static final int EXIT_INTERNAL_ERROR = 10;
-
-  /** Configuration error: the target path is not usable as given. */
-  private static final int EXIT_CONFIGURATION_ERROR = 2;
-
-  /** Baseline error: an explicit or cached baseline was found but cannot be used. */
-  private static final int EXIT_BASELINE_INCOMPATIBLE = 5;
-
   private static final Duration DEFAULT_ENGINE_TIMEOUT = Duration.ofMinutes(5);
 
   private final RepositoryHistoryProvider historyProvider;
@@ -65,6 +64,8 @@ public final class ScanUseCase {
   private final SarifReporter sarifReporter;
   private final BaselineResolver baselineResolver;
   private final BaselineComparator baselineComparator;
+  private final PolicyBundleParser policyBundleParser;
+  private final PolicyEvaluator policyEvaluator;
   private final String toolVersion;
   private final Duration engineTimeout;
   private final Clock clock;
@@ -79,6 +80,8 @@ public final class ScanUseCase {
    * @param sarifReporter writes {@code debt-hunter.sarif}
    * @param baselineResolver resolves the baseline to compare this scan against
    * @param baselineComparator classifies findings against the resolved baseline
+   * @param policyBundleParser parses the policy bundle configured for this scan, if any
+   * @param policyEvaluator evaluates the policy bundle against this scan's new findings
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    */
   public ScanUseCase(
@@ -89,6 +92,8 @@ public final class ScanUseCase {
       SarifReporter sarifReporter,
       BaselineResolver baselineResolver,
       BaselineComparator baselineComparator,
+      PolicyBundleParser policyBundleParser,
+      PolicyEvaluator policyEvaluator,
       String toolVersion) {
     this(
         historyProvider,
@@ -98,6 +103,8 @@ public final class ScanUseCase {
         sarifReporter,
         baselineResolver,
         baselineComparator,
+        policyBundleParser,
+        policyEvaluator,
         toolVersion,
         DEFAULT_ENGINE_TIMEOUT,
         Clock.systemUTC());
@@ -113,6 +120,8 @@ public final class ScanUseCase {
    * @param sarifReporter writes {@code debt-hunter.sarif}
    * @param baselineResolver resolves the baseline to compare this scan against
    * @param baselineComparator classifies findings against the resolved baseline
+   * @param policyBundleParser parses the policy bundle configured for this scan, if any
+   * @param policyEvaluator evaluates the policy bundle against this scan's new findings
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    * @param engineTimeout the maximum time to wait for any single engine
    * @param clock the clock used for timestamps and duration measurement
@@ -125,6 +134,8 @@ public final class ScanUseCase {
       SarifReporter sarifReporter,
       BaselineResolver baselineResolver,
       BaselineComparator baselineComparator,
+      PolicyBundleParser policyBundleParser,
+      PolicyEvaluator policyEvaluator,
       String toolVersion,
       Duration engineTimeout,
       Clock clock) {
@@ -135,6 +146,8 @@ public final class ScanUseCase {
     this.sarifReporter = Objects.requireNonNull(sarifReporter, "sarifReporter");
     this.baselineResolver = Objects.requireNonNull(baselineResolver, "baselineResolver");
     this.baselineComparator = Objects.requireNonNull(baselineComparator, "baselineComparator");
+    this.policyBundleParser = Objects.requireNonNull(policyBundleParser, "policyBundleParser");
+    this.policyEvaluator = Objects.requireNonNull(policyEvaluator, "policyEvaluator");
     this.toolVersion = Objects.requireNonNull(toolVersion, "toolVersion");
     this.engineTimeout = Objects.requireNonNull(engineTimeout, "engineTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -152,30 +165,52 @@ public final class ScanUseCase {
       repoInfo = historyProvider.inspect(request.repoPath());
     } catch (RepositoryAccessException e) {
       return ScanOutcome.ofError(
-          EXIT_INTERNAL_ERROR, "Failed to inspect repository: " + e.getMessage());
+          ExitCode.INTERNAL_ERROR.code(), "Failed to inspect repository: " + e.getMessage());
     }
 
     if (!repoInfo.isGitRepo()) {
       return ScanOutcome.ofError(
-          EXIT_CONFIGURATION_ERROR, "Not a Git repository: " + request.repoPath());
+          ExitCode.CONFIGURATION_ERROR.code(), "Not a Git repository: " + request.repoPath());
     }
 
     try {
       return analyseAndReport(request, repoInfo);
     } catch (RuntimeException e) {
-      return ScanOutcome.ofError(EXIT_INTERNAL_ERROR, "Scan failed: " + e.getMessage());
+      return ScanOutcome.ofError(ExitCode.INTERNAL_ERROR.code(), "Scan failed: " + e.getMessage());
     }
   }
 
+  /**
+   * Validates and orchestrates, in the documented pre-analysis order: configuration errors,
+   * insufficient history, an unusable baseline, then the engines themselves.
+   */
   private ScanOutcome analyseAndReport(ScanRequest request, RepositoryInfo repoInfo) {
+    PolicyBundle policyBundle;
+    try {
+      policyBundle = loadPolicyBundle(request.policyPath());
+    } catch (PolicyParseException e) {
+      return ScanOutcome.ofError(
+          ExitCode.CONFIGURATION_ERROR.code(), "Invalid policy: " + e.getMessage());
+    }
+
+    HistoryDepth historyDepth = mapHistoryDepth(repoInfo);
+    if (policyBundle.minimumHistoryDepth() != null
+        && historyDepth.ordinal() > policyBundle.minimumHistoryDepth().ordinal()) {
+      return ScanOutcome.ofError(
+          ExitCode.INSUFFICIENT_HISTORY.code(),
+          "Repository history depth "
+              + historyDepth
+              + " does not satisfy the policy's minimum of "
+              + policyBundle.minimumHistoryDepth());
+    }
+
     BaselineResolution baselineResolution =
         baselineResolver.resolve(request.baselinePath(), toolVersion);
     if (baselineResolution.isIncompatible()) {
       return ScanOutcome.ofError(
-          EXIT_BASELINE_INCOMPATIBLE, baselineResolution.incompatibilityReason());
+          ExitCode.BASELINE_UNAVAILABLE.code(), baselineResolution.incompatibilityReason());
     }
 
-    HistoryDepth historyDepth = mapHistoryDepth(repoInfo);
     RepositoryContext context =
         new RepositoryContext(request.repoPath(), List.of(), VcsType.GIT, historyDepth);
 
@@ -223,8 +258,25 @@ public final class ScanUseCase {
     BaselineComparator.ComparisonResult comparison =
         baselineComparator.compare(allFindings, baselineResolution.baseline());
 
-    // Policy evaluation is stubbed until FR-08; every scan currently passes.
-    PolicyResult policyResult = PolicyResult.passed("unversioned");
+    PolicyResult evaluated =
+        policyEvaluator.evaluate(comparison.findings(), policyBundle, request.mode());
+
+    PolicyResult policyResult;
+    int exitCode;
+    if (evaluated.status() == PolicyStatus.FAILED
+        && baselineResolution.provenance() == BaselineProvenance.NONE) {
+      // Observe mode: no baseline exists yet to gate against, so a first-ever scan reports what
+      // enforcement *would* have done without actually failing the build.
+      policyResult =
+          new PolicyResult(evaluated.bundleVersion(), PolicyStatus.WOULD_FAIL, evaluated.reasons());
+      exitCode = ExitCode.POLICY_SATISFIED.code();
+    } else {
+      policyResult = evaluated;
+      exitCode =
+          evaluated.status() == PolicyStatus.PASSED
+              ? ExitCode.POLICY_SATISFIED.code()
+              : ExitCode.POLICY_VIOLATED.code();
+    }
 
     ScanResult scanResult =
         new ScanResult(run, comparison.findings(), Map.copyOf(allMetrics), policyResult);
@@ -235,11 +287,29 @@ public final class ScanUseCase {
       metricsReporter.write(scanResult, request.outputDir());
       sarifReporter.write(scanResult, request.outputDir());
     } catch (ReportWriteException e) {
-      return ScanOutcome.ofError(EXIT_INTERNAL_ERROR, "Failed to write outputs: " + e.getMessage());
+      return ScanOutcome.ofError(
+          ExitCode.INTERNAL_ERROR.code(), "Failed to write outputs: " + e.getMessage());
     }
 
-    int exitCode = policyResult.status() == PolicyStatus.PASSED ? 0 : 1;
     return ScanOutcome.ofResult(exitCode, scanResult);
+  }
+
+  /**
+   * Loads and parses the policy bundle at {@code policyPath}, or {@link PolicyBundle#permissive()}
+   * if none was configured.
+   */
+  private PolicyBundle loadPolicyBundle(Path policyPath) {
+    if (policyPath == null) {
+      return PolicyBundle.permissive();
+    }
+    String yaml;
+    try {
+      yaml = Files.readString(policyPath);
+    } catch (IOException e) {
+      throw new PolicyParseException(
+          "Could not read policy file " + policyPath + ": " + e.getMessage(), e);
+    }
+    return policyBundleParser.parse(yaml);
   }
 
   private EngineResult runWithTimeout(
