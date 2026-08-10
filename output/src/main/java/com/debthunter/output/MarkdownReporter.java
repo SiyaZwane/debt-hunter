@@ -2,6 +2,7 @@ package com.debthunter.output;
 
 import com.debthunter.domain.EngineStatus;
 import com.debthunter.domain.Finding;
+import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.ScanResult;
 import com.debthunter.domain.Severity;
 import java.io.IOException;
@@ -52,10 +53,23 @@ public final class MarkdownReporter {
         .append("\n\n");
     markdown.append("**Degraded:** ").append(scanResult.isDegraded()).append("\n\n");
 
+    appendHistoryWarning(markdown, scanResult.run().historyDepth());
     appendEngineStatuses(markdown, scanResult.run().engines());
     appendFindings(markdown, scanResult.findings());
 
     return markdown.toString();
+  }
+
+  private void appendHistoryWarning(StringBuilder markdown, HistoryDepth historyDepth) {
+    if (historyDepth == HistoryDepth.FULL) {
+      return;
+    }
+    markdown
+        .append("> **Warning:** history depth is ")
+        .append(historyDepth.displayName())
+        .append(". Hotspot, churn, temporal-coupling, and knowledge-concentration findings have")
+        .append(" reduced confidence until full history is available. Run `debt-hunter doctor`")
+        .append(" for recommendations.\n\n");
   }
 
   private void appendEngineStatuses(StringBuilder markdown, java.util.List<EngineStatus> engines) {

@@ -1,5 +1,7 @@
 package com.debthunter.application.scan;
 
+import com.debthunter.application.history.HistoryDepthCheck;
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.domain.AnalysisRun;
 import com.debthunter.domain.DebtMetric;
 import com.debthunter.domain.EngineStatus;
@@ -66,6 +68,7 @@ public final class ScanUseCase {
   private final BaselineComparator baselineComparator;
   private final PolicyBundleParser policyBundleParser;
   private final PolicyEvaluator policyEvaluator;
+  private final HistoryDepthEnforcer historyDepthEnforcer;
   private final String toolVersion;
   private final Duration engineTimeout;
   private final Clock clock;
@@ -82,6 +85,7 @@ public final class ScanUseCase {
    * @param baselineComparator classifies findings against the resolved baseline
    * @param policyBundleParser parses the policy bundle configured for this scan, if any
    * @param policyEvaluator evaluates the policy bundle against this scan's new findings
+   * @param historyDepthEnforcer checks history depth and adjusts confidence when it's incomplete
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    */
   public ScanUseCase(
@@ -94,6 +98,7 @@ public final class ScanUseCase {
       BaselineComparator baselineComparator,
       PolicyBundleParser policyBundleParser,
       PolicyEvaluator policyEvaluator,
+      HistoryDepthEnforcer historyDepthEnforcer,
       String toolVersion) {
     this(
         historyProvider,
@@ -105,6 +110,7 @@ public final class ScanUseCase {
         baselineComparator,
         policyBundleParser,
         policyEvaluator,
+        historyDepthEnforcer,
         toolVersion,
         DEFAULT_ENGINE_TIMEOUT,
         Clock.systemUTC());
@@ -122,6 +128,7 @@ public final class ScanUseCase {
    * @param baselineComparator classifies findings against the resolved baseline
    * @param policyBundleParser parses the policy bundle configured for this scan, if any
    * @param policyEvaluator evaluates the policy bundle against this scan's new findings
+   * @param historyDepthEnforcer checks history depth and adjusts confidence when it's incomplete
    * @param toolVersion this build's version, recorded in every {@link AnalysisRun}
    * @param engineTimeout the maximum time to wait for any single engine
    * @param clock the clock used for timestamps and duration measurement
@@ -136,6 +143,7 @@ public final class ScanUseCase {
       BaselineComparator baselineComparator,
       PolicyBundleParser policyBundleParser,
       PolicyEvaluator policyEvaluator,
+      HistoryDepthEnforcer historyDepthEnforcer,
       String toolVersion,
       Duration engineTimeout,
       Clock clock) {
@@ -148,6 +156,8 @@ public final class ScanUseCase {
     this.baselineComparator = Objects.requireNonNull(baselineComparator, "baselineComparator");
     this.policyBundleParser = Objects.requireNonNull(policyBundleParser, "policyBundleParser");
     this.policyEvaluator = Objects.requireNonNull(policyEvaluator, "policyEvaluator");
+    this.historyDepthEnforcer =
+        Objects.requireNonNull(historyDepthEnforcer, "historyDepthEnforcer");
     this.toolVersion = Objects.requireNonNull(toolVersion, "toolVersion");
     this.engineTimeout = Objects.requireNonNull(engineTimeout, "engineTimeout");
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -194,14 +204,11 @@ public final class ScanUseCase {
     }
 
     HistoryDepth historyDepth = mapHistoryDepth(repoInfo);
-    if (policyBundle.minimumHistoryDepth() != null
-        && historyDepth.ordinal() > policyBundle.minimumHistoryDepth().ordinal()) {
+    HistoryDepthCheck historyDepthCheck =
+        historyDepthEnforcer.check(historyDepth, policyBundle.minimumHistoryDepth());
+    if (!historyDepthCheck.sufficient()) {
       return ScanOutcome.ofError(
-          ExitCode.INSUFFICIENT_HISTORY.code(),
-          "Repository history depth "
-              + historyDepth
-              + " does not satisfy the policy's minimum of "
-              + policyBundle.minimumHistoryDepth());
+          ExitCode.INSUFFICIENT_HISTORY.code(), historyDepthCheck.diagnosticMessage());
     }
 
     BaselineResolution baselineResolution =
@@ -241,6 +248,9 @@ public final class ScanUseCase {
       executor.shutdownNow();
     }
 
+    List<Finding> confidenceAdjustedFindings =
+        historyDepthEnforcer.adjustConfidence(allFindings, historyDepth);
+
     AnalysisRun run =
         AnalysisRun.builder()
             .id(UUID.randomUUID().toString())
@@ -256,7 +266,7 @@ public final class ScanUseCase {
             .build();
 
     BaselineComparator.ComparisonResult comparison =
-        baselineComparator.compare(allFindings, baselineResolution.baseline());
+        baselineComparator.compare(confidenceAdjustedFindings, baselineResolution.baseline());
 
     PolicyResult evaluated =
         policyEvaluator.evaluate(comparison.findings(), policyBundle, request.mode());

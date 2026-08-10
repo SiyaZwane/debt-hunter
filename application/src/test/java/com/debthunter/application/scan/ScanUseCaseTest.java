@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.domain.Category;
 import com.debthunter.domain.DebtMetric;
 import com.debthunter.domain.EngineHealth;
@@ -59,6 +60,7 @@ class ScanUseCaseTest {
         new BaselineComparator(),
         new PolicyBundleParser(),
         new PolicyEvaluator(),
+        new HistoryDepthEnforcer(),
         "0.1.0-test",
         timeout,
         Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));

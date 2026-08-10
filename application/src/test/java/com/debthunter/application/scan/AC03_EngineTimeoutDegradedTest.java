@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.domain.EngineHealth;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisMode;
@@ -80,6 +81,7 @@ class AC03_EngineTimeoutDegradedTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test",
             Duration.ofMillis(150),
             Clock.systemUTC());

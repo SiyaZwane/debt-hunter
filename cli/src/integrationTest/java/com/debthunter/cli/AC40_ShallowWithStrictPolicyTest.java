@@ -24,13 +24,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * AC-35: a repository whose history is shallower than the policy's {@code minimumHistoryDepth}
- * fails the scan with exit code 4, before any engine runs. Shallowness is simulated the same way
- * {@link GitHistoryProvider#inspect} detects it — a {@code .git/shallow} marker file, not an actual
- * truncated clone.
+ * AC-40: a shallow repository fails a policy that requires {@code minimumHistoryDepth: FULL} with
+ * exit code 4, before any engine runs.
  */
 @Tag("integration")
-class AC35_ShallowHistoryExitCode4Test {
+class AC40_ShallowWithStrictPolicyTest {
 
   private FixtureRepoBuilder fixture;
 
@@ -42,7 +40,7 @@ class AC35_ShallowHistoryExitCode4Test {
   }
 
   @Test
-  void ac35_shallowRepositoryFailsAFullHistoryPolicyWithExitCodeFour(
+  void ac40_shallowHistoryFailsAFullHistoryPolicyWithExitCodeFour(
       @TempDir Path outputDir, @TempDir Path workDir) throws Exception {
     fixture = FixtureRepoBuilder.init().commitFile("Foo.java", "class Foo {}", "add Foo");
     Files.createFile(fixture.path().resolve(".git").resolve("shallow"));

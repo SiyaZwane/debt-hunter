@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ExitCode;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.domain.Category;
@@ -100,6 +101,7 @@ class AC37_ObserveModeTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, policyPath, null, scanUseCase, List.of(engine));

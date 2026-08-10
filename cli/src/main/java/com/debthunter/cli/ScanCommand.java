@@ -1,5 +1,6 @@
 package com.debthunter.cli;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ScanOutcome;
 import com.debthunter.application.scan.ScanRequest;
 import com.debthunter.application.scan.ScanUseCase;
@@ -140,6 +141,7 @@ public final class ScanCommand implements Callable<Integer> {
         new BaselineComparator(),
         new PolicyBundleParser(),
         new PolicyEvaluator(),
+        new HistoryDepthEnforcer(),
         TOOL_VERSION);
   }
 

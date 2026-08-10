@@ -2,6 +2,7 @@ package com.debthunter.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ExitCode;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.output.JsonReporter;
@@ -57,6 +58,7 @@ class AC34_InvalidPolicyExitCode2Test {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, policyPath, null, scanUseCase, List.of());

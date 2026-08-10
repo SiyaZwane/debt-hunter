@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.domain.Category;
 import com.debthunter.domain.Finding;
@@ -85,6 +86,7 @@ class AC01_ValidRepoProducesAllOutputsTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command = new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(engine));
 

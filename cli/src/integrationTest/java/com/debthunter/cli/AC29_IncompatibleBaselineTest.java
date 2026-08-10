@@ -2,6 +2,7 @@ package com.debthunter.cli;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.domain.AnalysisRun;
 import com.debthunter.domain.HistoryDepth;
@@ -74,6 +75,7 @@ class AC29_IncompatibleBaselineTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, baselinePath, scanUseCase, List.of());

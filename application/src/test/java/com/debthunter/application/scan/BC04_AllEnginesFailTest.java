@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisMode;
 import com.debthunter.engine.spi.CostClass;
@@ -50,6 +51,7 @@ class BC04_AllEnginesFailTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
 
     ScanRequest request =
