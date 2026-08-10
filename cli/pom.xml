@@ -37,6 +37,11 @@
       <groupId>com.debthunter</groupId>
       <artifactId>integration</artifactId>
     </dependency>
+    <!-- ExplainCommand delegates to an Explainer; a separate command, never on the scan path. -->
+    <dependency>
+      <groupId>com.debthunter</groupId>
+      <artifactId>ai</artifactId>
+    </dependency>
     <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
