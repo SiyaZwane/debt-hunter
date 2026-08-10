@@ -1,14 +1,18 @@
 package com.debthunter.output;
 
+import com.debthunter.domain.EngineHealth;
 import com.debthunter.domain.EngineStatus;
 import com.debthunter.domain.Finding;
 import com.debthunter.domain.HistoryDepth;
+import com.debthunter.domain.PolicyResult;
+import com.debthunter.domain.PolicyViolation;
 import com.debthunter.domain.ScanResult;
 import com.debthunter.domain.Severity;
 import com.debthunter.domain.SuppressionEntry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -102,13 +106,25 @@ public final class MarkdownReporter {
         .append(scanResult.run().historyDepth().displayName())
         .append("\n\n");
     markdown.append("**Degraded:** ").append(scanResult.isDegraded()).append("\n\n");
+    markdown
+        .append("**Existing findings:** ")
+        .append(countExisting(scanResult.findings()))
+        .append("\n\n");
 
     appendHistoryWarning(markdown, scanResult.run().historyDepth());
     appendEngineStatuses(markdown, scanResult.run().engines());
+    appendDegradedEngines(markdown, scanResult.run().engines());
     appendFindings(markdown, scanResult.findings());
+    appendNewFindingsBySeverity(markdown, scanResult.findings());
+    appendTopNewFindings(markdown, scanResult.findings());
+    appendBreachedThresholds(markdown, scanResult.policy());
     appendActiveSuppressions(markdown, activeSuppressions);
 
     return markdown.toString();
+  }
+
+  private long countExisting(List<Finding> findings) {
+    return findings.stream().filter(finding -> !finding.isNew()).count();
   }
 
   private void appendHistoryWarning(StringBuilder markdown, HistoryDepth historyDepth) {
@@ -161,6 +177,100 @@ public final class MarkdownReporter {
       if (count > 0) {
         markdown.append("- ").append(severity).append(": ").append(count).append("\n");
       }
+    }
+    markdown.append("\n");
+  }
+
+  private void appendNewFindingsBySeverity(StringBuilder markdown, List<Finding> findings) {
+    List<Finding> newFindings = findings.stream().filter(Finding::isNew).toList();
+    markdown.append("## New findings (").append(newFindings.size()).append(")\n\n");
+    if (newFindings.isEmpty()) {
+      markdown.append("No new findings.\n\n");
+      return;
+    }
+    Map<Severity, Long> countsBySeverity =
+        newFindings.stream()
+            .collect(
+                Collectors.groupingBy(
+                    Finding::severity, () -> new EnumMap<>(Severity.class), Collectors.counting()));
+    for (Severity severity : Severity.values()) {
+      long count = countsBySeverity.getOrDefault(severity, 0L);
+      if (count > 0) {
+        markdown.append("- ").append(severity).append(": ").append(count).append("\n");
+      }
+    }
+    markdown.append("\n");
+  }
+
+  private void appendTopNewFindings(StringBuilder markdown, List<Finding> findings) {
+    List<Finding> top =
+        findings.stream()
+            .filter(Finding::isNew)
+            .sorted(Comparator.comparingDouble(Finding::score).reversed())
+            .limit(3)
+            .toList();
+    markdown.append("## Top new findings\n\n");
+    if (top.isEmpty()) {
+      markdown.append("No new findings.\n\n");
+      return;
+    }
+    for (Finding finding : top) {
+      markdown
+          .append("- `")
+          .append(finding.fingerprint())
+          .append("` ")
+          .append(finding.severity())
+          .append(" (score ")
+          .append(finding.score())
+          .append("): ")
+          .append(finding.message())
+          .append(" — ")
+          .append(finding.path())
+          .append("\n");
+    }
+    markdown.append("\n");
+  }
+
+  private void appendBreachedThresholds(StringBuilder markdown, PolicyResult policy) {
+    List<PolicyViolation> violations = policy.reasons();
+    markdown.append("## Breached thresholds (").append(violations.size()).append(")\n\n");
+    if (violations.isEmpty()) {
+      markdown.append("No breached thresholds.\n\n");
+      return;
+    }
+    for (PolicyViolation violation : violations) {
+      markdown
+          .append("- `")
+          .append(violation.rule())
+          .append("` — threshold: ")
+          .append(violation.threshold())
+          .append(", actual: ")
+          .append(violation.actual())
+          .append("\n");
+    }
+    markdown.append("\n");
+  }
+
+  private void appendDegradedEngines(StringBuilder markdown, List<EngineStatus> engines) {
+    List<EngineStatus> degraded =
+        engines.stream().filter(engine -> engine.status() != EngineHealth.OK).toList();
+    markdown.append("## Degraded engines (").append(degraded.size()).append(")\n\n");
+    if (degraded.isEmpty()) {
+      markdown.append("No degraded engines.\n\n");
+      return;
+    }
+    for (EngineStatus engine : degraded) {
+      markdown
+          .append("- ")
+          .append(engine.id())
+          .append(" (")
+          .append(engine.version())
+          .append("): ")
+          .append(engine.status());
+      if (engine.reason() != null) {
+        markdown.append(" — ").append(engine.reason());
+      }
+      markdown.append("\n");
     }
     markdown.append("\n");
   }
