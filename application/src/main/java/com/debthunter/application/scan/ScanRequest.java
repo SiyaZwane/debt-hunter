@@ -1,5 +1,6 @@
 package com.debthunter.application.scan;
 
+import com.debthunter.domain.Severity;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisMode;
 import com.debthunter.repository.HistoryWindow;
@@ -18,7 +19,7 @@ public record ScanRequest(
     List<AnalysisEngine> engines,
     HistoryWindow historyWindow,
     boolean offline,
-    String failOn,
+    Severity failOn,
     Path baselinePath,
     Map<String, String> projects) {
 
@@ -43,7 +44,8 @@ public record ScanRequest(
    * @param engines the analysis engines to run
    * @param historyWindow only consider commits at or after this point, or {@code null}
    * @param offline whether to skip network-dependent steps
-   * @param failOn severity threshold that should fail the build, or {@code null}
+   * @param failOn severity threshold that should fail the build in addition to the policy bundle's
+   *     own rules, or {@code null}
    * @param baselinePath path to a baseline artefact to compare against, or {@code null}
    */
   public ScanRequest(
@@ -55,7 +57,7 @@ public record ScanRequest(
       List<AnalysisEngine> engines,
       HistoryWindow historyWindow,
       boolean offline,
-      String failOn,
+      Severity failOn,
       Path baselinePath) {
     this(
         repoPath,

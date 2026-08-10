@@ -8,6 +8,7 @@ import com.debthunter.application.scan.ScanOutcome;
 import com.debthunter.application.scan.ScanRequest;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.domain.ScanResult;
+import com.debthunter.domain.Severity;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisMode;
 import com.debthunter.integration.HttpResultUploader;
@@ -61,8 +62,12 @@ public final class ScanCommand implements Callable<Integer> {
   @Option(names = "--offline", description = "Skip any network-dependent steps.")
   private boolean offline;
 
-  @Option(names = "--fail-on", description = "Severity threshold that should fail the build.")
-  private String failOn;
+  @Option(
+      names = "--fail-on",
+      description =
+          "Severity threshold that should fail the build, in addition to any configured policy"
+              + " (e.g. --fail-on HIGH).")
+  private Severity failOn;
 
   @Option(
       names = "--history-window-since",
@@ -227,6 +232,49 @@ public final class ScanCommand implements Callable<Integer> {
       URI publishEndpoint,
       boolean offline,
       Map<String, String> projects) {
+    this(
+        repoPath,
+        outputDir,
+        policyPath,
+        baselinePath,
+        scanUseCase,
+        engines,
+        publishUseCase,
+        publishEndpoint,
+        offline,
+        projects,
+        null);
+  }
+
+  /**
+   * Constructs the command with every collaborator and option explicit, including monorepo project
+   * slicing and a {@code --fail-on} override, bypassing picocli option parsing entirely, for
+   * testing.
+   *
+   * @param repoPath repository path to scan; defaults to {@code "."} if {@code null}
+   * @param outputDir directory to write report files into
+   * @param policyPath path to a policy bundle file, or {@code null}
+   * @param baselinePath path to a baseline artefact to compare against, or {@code null}
+   * @param scanUseCase the use case to delegate to
+   * @param engines the analysis engines to run
+   * @param publishUseCase the use case to delegate optional publication to
+   * @param publishEndpoint where to publish the scan result, or {@code null} if not configured
+   * @param offline whether to skip publication entirely
+   * @param projects repeatable name-to-pattern mapping for monorepo project slicing
+   * @param failOn severity threshold that should fail the build, or {@code null}
+   */
+  ScanCommand(
+      Path repoPath,
+      Path outputDir,
+      Path policyPath,
+      Path baselinePath,
+      ScanUseCase scanUseCase,
+      List<AnalysisEngine> engines,
+      PublishUseCase publishUseCase,
+      URI publishEndpoint,
+      boolean offline,
+      Map<String, String> projects,
+      Severity failOn) {
     this.repoPath = repoPath == null ? Path.of(".") : repoPath;
     this.outputDir = outputDir;
     this.policyPath = policyPath;
@@ -237,6 +285,7 @@ public final class ScanCommand implements Callable<Integer> {
     this.publishEndpoint = publishEndpoint;
     this.offline = offline;
     this.projects = projects;
+    this.failOn = failOn;
     this.markdownReporter = new MarkdownReporter();
   }
 
