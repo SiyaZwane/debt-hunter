@@ -9,6 +9,7 @@ import com.debthunter.domain.Finding;
 import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.PolicyResult;
 import com.debthunter.domain.PolicyStatus;
+import com.debthunter.domain.PolicyViolation;
 import com.debthunter.domain.ScanResult;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisRequest;
@@ -58,6 +59,12 @@ import java.util.concurrent.TimeoutException;
 public final class ScanUseCase {
 
   private static final Duration DEFAULT_ENGINE_TIMEOUT = Duration.ofMinutes(5);
+
+  // Pure, stateless, and never substituted with a fake in any test (unlike the collaborators
+  // below, which every test still constructs for real too, but were designed injectable from the
+  // start) — instantiated directly rather than threaded through both constructors and every one
+  // of their many existing call sites.
+  private final ProjectSlicer projectSlicer = new ProjectSlicer();
 
   private final RepositoryHistoryProvider historyProvider;
   private final JsonReporter jsonReporter;
@@ -268,25 +275,22 @@ public final class ScanUseCase {
     BaselineComparator.ComparisonResult comparison =
         baselineComparator.compare(confidenceAdjustedFindings, baselineResolution.baseline());
 
-    PolicyResult evaluated =
-        policyEvaluator.evaluate(comparison.findings(), policyBundle, request.mode());
+    boolean sliceByProject = !request.projects().isEmpty();
+    Map<String, List<Finding>> findingsByProject =
+        sliceByProject
+            ? projectSlicer.slice(comparison.findings(), projectSpecsFor(request.projects()))
+            : Map.of();
 
-    PolicyResult policyResult;
-    int exitCode;
-    if (evaluated.status() == PolicyStatus.FAILED
-        && baselineResolution.provenance() == BaselineProvenance.NONE) {
-      // Observe mode: no baseline exists yet to gate against, so a first-ever scan reports what
-      // enforcement *would* have done without actually failing the build.
-      policyResult =
-          new PolicyResult(evaluated.bundleVersion(), PolicyStatus.WOULD_FAIL, evaluated.reasons());
-      exitCode = ExitCode.POLICY_SATISFIED.code();
-    } else {
-      policyResult = evaluated;
-      exitCode =
-          evaluated.status() == PolicyStatus.PASSED
-              ? ExitCode.POLICY_SATISFIED.code()
-              : ExitCode.POLICY_VIOLATED.code();
-    }
+    PolicyResult policyResult =
+        sliceByProject
+            ? evaluatePerProject(findingsByProject, policyBundle, request, baselineResolution)
+            : applyObserveMode(
+                policyEvaluator.evaluate(comparison.findings(), policyBundle, request.mode()),
+                baselineResolution);
+    int exitCode =
+        policyResult.status() == PolicyStatus.FAILED
+            ? ExitCode.POLICY_VIOLATED.code()
+            : ExitCode.POLICY_SATISFIED.code();
 
     ScanResult scanResult =
         new ScanResult(run, comparison.findings(), Map.copyOf(allMetrics), policyResult);
@@ -295,13 +299,74 @@ public final class ScanUseCase {
       jsonReporter.write(scanResult, request.outputDir());
       markdownReporter.write(scanResult, request.outputDir());
       metricsReporter.write(scanResult, request.outputDir());
-      sarifReporter.write(scanResult, request.outputDir());
+      if (sliceByProject) {
+        sarifReporter.writeMultiProject(findingsByProject, toolVersion, request.outputDir());
+      } else {
+        sarifReporter.write(scanResult, request.outputDir());
+      }
     } catch (ReportWriteException e) {
       return ScanOutcome.ofError(
           ExitCode.INTERNAL_ERROR.code(), "Failed to write outputs: " + e.getMessage());
     }
 
     return ScanOutcome.ofResult(exitCode, scanResult);
+  }
+
+  private List<ProjectSlicer.ProjectSpec> projectSpecsFor(Map<String, String> projects) {
+    return projects.entrySet().stream()
+        .map(entry -> new ProjectSlicer.ProjectSpec(entry.getKey(), entry.getValue()))
+        .toList();
+  }
+
+  /**
+   * Evaluates the policy bundle once per project, then combines the results into one {@link
+   * PolicyResult}: {@link PolicyStatus#FAILED} if any project failed, each violation's rule
+   * prefixed with the project it came from so a single combined result stays traceable to its
+   * origin project.
+   */
+  private PolicyResult evaluatePerProject(
+      Map<String, List<Finding>> findingsByProject,
+      PolicyBundle policyBundle,
+      ScanRequest request,
+      BaselineResolution baselineResolution) {
+    List<PolicyViolation> combinedReasons = new ArrayList<>();
+    boolean anyFailed = false;
+    boolean anyWouldFail = false;
+    for (Map.Entry<String, List<Finding>> entry : findingsByProject.entrySet()) {
+      PolicyResult perProject =
+          applyObserveMode(
+              policyEvaluator.evaluate(entry.getValue(), policyBundle, request.mode()),
+              baselineResolution);
+      anyFailed |= perProject.status() == PolicyStatus.FAILED;
+      anyWouldFail |= perProject.status() == PolicyStatus.WOULD_FAIL;
+      for (PolicyViolation violation : perProject.reasons()) {
+        combinedReasons.add(
+            new PolicyViolation(
+                entry.getKey() + ": " + violation.rule(),
+                violation.threshold(),
+                violation.actual(),
+                violation.findingIds()));
+      }
+    }
+    PolicyStatus combinedStatus =
+        anyFailed
+            ? PolicyStatus.FAILED
+            : anyWouldFail ? PolicyStatus.WOULD_FAIL : PolicyStatus.PASSED;
+    return new PolicyResult(policyBundle.version(), combinedStatus, combinedReasons);
+  }
+
+  /**
+   * Observe mode: no baseline exists yet to gate against, so a first-ever scan reports what
+   * enforcement *would* have done without actually failing the build.
+   */
+  private PolicyResult applyObserveMode(
+      PolicyResult evaluated, BaselineResolution baselineResolution) {
+    if (evaluated.status() == PolicyStatus.FAILED
+        && baselineResolution.provenance() == BaselineProvenance.NONE) {
+      return new PolicyResult(
+          evaluated.bundleVersion(), PolicyStatus.WOULD_FAIL, evaluated.reasons());
+    }
+    return evaluated;
   }
 
   /**

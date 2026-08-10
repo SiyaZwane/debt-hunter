@@ -26,7 +26,9 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -78,6 +80,13 @@ public final class ScanCommand implements Callable<Integer> {
 
   @Option(names = "--publish-timeout", description = "Timeout for the publish request, e.g. PT30S.")
   private Duration publishTimeout = Duration.ofSeconds(30);
+
+  @Option(
+      names = "--project",
+      description =
+          "Repeatable name=pathPrefixOrGlob mapping for monorepo project slicing, e.g."
+              + " --project frontend=frontend/**.")
+  private Map<String, String> projects = new LinkedHashMap<>();
 
   private final ScanUseCase scanUseCase;
   private final List<AnalysisEngine> engines;
@@ -179,6 +188,45 @@ public final class ScanCommand implements Callable<Integer> {
       PublishUseCase publishUseCase,
       URI publishEndpoint,
       boolean offline) {
+    this(
+        repoPath,
+        outputDir,
+        policyPath,
+        baselinePath,
+        scanUseCase,
+        engines,
+        publishUseCase,
+        publishEndpoint,
+        offline,
+        Map.of());
+  }
+
+  /**
+   * Constructs the command with every collaborator and option explicit, including monorepo project
+   * slicing, bypassing picocli option parsing entirely, for testing.
+   *
+   * @param repoPath repository path to scan; defaults to {@code "."} if {@code null}
+   * @param outputDir directory to write report files into
+   * @param policyPath path to a policy bundle file, or {@code null}
+   * @param baselinePath path to a baseline artefact to compare against, or {@code null}
+   * @param scanUseCase the use case to delegate to
+   * @param engines the analysis engines to run
+   * @param publishUseCase the use case to delegate optional publication to
+   * @param publishEndpoint where to publish the scan result, or {@code null} if not configured
+   * @param offline whether to skip publication entirely
+   * @param projects repeatable name-to-pattern mapping for monorepo project slicing
+   */
+  ScanCommand(
+      Path repoPath,
+      Path outputDir,
+      Path policyPath,
+      Path baselinePath,
+      ScanUseCase scanUseCase,
+      List<AnalysisEngine> engines,
+      PublishUseCase publishUseCase,
+      URI publishEndpoint,
+      boolean offline,
+      Map<String, String> projects) {
     this.repoPath = repoPath == null ? Path.of(".") : repoPath;
     this.outputDir = outputDir;
     this.policyPath = policyPath;
@@ -188,6 +236,7 @@ public final class ScanCommand implements Callable<Integer> {
     this.publishUseCase = publishUseCase;
     this.publishEndpoint = publishEndpoint;
     this.offline = offline;
+    this.projects = projects;
     this.markdownReporter = new MarkdownReporter();
   }
 
@@ -223,7 +272,8 @@ public final class ScanCommand implements Callable<Integer> {
             historyWindowSince == null ? null : HistoryWindow.since(historyWindowSince),
             offline,
             failOn,
-            baselinePath);
+            baselinePath,
+            projects);
 
     ScanOutcome outcome = scanUseCase.execute(request);
 
