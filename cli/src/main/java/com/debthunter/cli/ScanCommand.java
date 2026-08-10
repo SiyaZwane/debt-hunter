@@ -275,6 +275,51 @@ public final class ScanCommand implements Callable<Integer> {
       boolean offline,
       Map<String, String> projects,
       Severity failOn) {
+    this(
+        repoPath,
+        outputDir,
+        policyPath,
+        baselinePath,
+        scanUseCase,
+        engines,
+        publishUseCase,
+        publishEndpoint,
+        offline,
+        projects,
+        failOn,
+        null);
+  }
+
+  /**
+   * Constructs the command with every collaborator and option explicit, including a {@code
+   * --history-window-since} bound, bypassing picocli option parsing entirely, for testing.
+   *
+   * @param repoPath repository path to scan; defaults to {@code "."} if {@code null}
+   * @param outputDir directory to write report files into
+   * @param policyPath path to a policy bundle file, or {@code null}
+   * @param baselinePath path to a baseline artefact to compare against, or {@code null}
+   * @param scanUseCase the use case to delegate to
+   * @param engines the analysis engines to run
+   * @param publishUseCase the use case to delegate optional publication to
+   * @param publishEndpoint where to publish the scan result, or {@code null} if not configured
+   * @param offline whether to skip publication entirely
+   * @param projects repeatable name-to-pattern mapping for monorepo project slicing
+   * @param failOn severity threshold that should fail the build, or {@code null}
+   * @param historyWindowSince only consider commits at or after this instant, or {@code null}
+   */
+  ScanCommand(
+      Path repoPath,
+      Path outputDir,
+      Path policyPath,
+      Path baselinePath,
+      ScanUseCase scanUseCase,
+      List<AnalysisEngine> engines,
+      PublishUseCase publishUseCase,
+      URI publishEndpoint,
+      boolean offline,
+      Map<String, String> projects,
+      Severity failOn,
+      Instant historyWindowSince) {
     this.repoPath = repoPath == null ? Path.of(".") : repoPath;
     this.outputDir = outputDir;
     this.policyPath = policyPath;
@@ -286,6 +331,7 @@ public final class ScanCommand implements Callable<Integer> {
     this.offline = offline;
     this.projects = projects;
     this.failOn = failOn;
+    this.historyWindowSince = historyWindowSince;
     this.markdownReporter = new MarkdownReporter();
   }
 

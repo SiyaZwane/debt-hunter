@@ -38,6 +38,7 @@ import com.debthunter.repository.RepositoryHistoryProvider;
 import com.debthunter.repository.RepositoryInfo;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -214,7 +215,7 @@ public final class ScanUseCase {
           ExitCode.CONFIGURATION_ERROR.code(), "Invalid policy: " + e.getMessage());
     }
 
-    HistoryDepth historyDepth = mapHistoryDepth(repoInfo);
+    HistoryDepth historyDepth = mapHistoryDepth(repoInfo, request.historyWindow());
     HistoryDepthCheck historyDepthCheck =
         historyDepthEnforcer.check(historyDepth, policyBundle.minimumHistoryDepth());
     if (!historyDepthCheck.sufficient()) {
@@ -383,7 +384,7 @@ public final class ScanUseCase {
             request.repoPath(),
             request.baseRef(),
             request.mode(),
-            toEngineTimeoutWindow(request.historyWindow()),
+            historyWindowSince(request.historyWindow()),
             Map.of(),
             engineTimeout,
             0);
@@ -403,14 +404,24 @@ public final class ScanUseCase {
     }
   }
 
-  private HistoryDepth mapHistoryDepth(RepositoryInfo info) {
-    return info.isShallow() || info.isGrafted() ? HistoryDepth.SHALLOW : HistoryDepth.FULL;
+  /**
+   * The repository's history depth for this scan, combining two independent restrictions: a shallow
+   * or grafted clone (an environmental limitation) and a {@code --history-window-since} (a
+   * deliberate, self-imposed one). Either alone means the same thing downstream — findings computed
+   * from commit history have less context than they would with the complete history — so whichever
+   * is more restrictive wins.
+   */
+  private HistoryDepth mapHistoryDepth(RepositoryInfo info, HistoryWindow window) {
+    HistoryDepth cloneDepth =
+        info.isShallow() || info.isGrafted() ? HistoryDepth.SHALLOW : HistoryDepth.FULL;
+    boolean windowed = window != null && window.since() != null;
+    if (!windowed || cloneDepth.ordinal() >= HistoryDepth.PARTIAL.ordinal()) {
+      return cloneDepth;
+    }
+    return HistoryDepth.PARTIAL;
   }
 
-  private Duration toEngineTimeoutWindow(HistoryWindow window) {
-    if (window == null || window.since() == null) {
-      return null;
-    }
-    return Duration.between(window.since(), clock.instant());
+  private Instant historyWindowSince(HistoryWindow window) {
+    return window == null ? null : window.since();
   }
 }

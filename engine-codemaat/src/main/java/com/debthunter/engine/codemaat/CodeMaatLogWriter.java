@@ -38,13 +38,28 @@ public final class CodeMaatLogWriter {
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ISO_LOCAL_DATE;
 
   /**
-   * Writes {@code repoPath}'s commit history, in Code Maat's git2 format, to {@code targetLogFile}.
+   * Writes {@code repoPath}'s complete commit history, in Code Maat's git2 format, to {@code
+   * targetLogFile}.
    *
    * @param repoPath the repository's working-tree path
    * @param targetLogFile the file to write; created or overwritten
    * @return {@code targetLogFile}, for chaining
    */
   public Path writeLog(Path repoPath, Path targetLogFile) {
+    return writeLog(repoPath, targetLogFile, null);
+  }
+
+  /**
+   * Writes {@code repoPath}'s commit history, in Code Maat's git2 format, to {@code targetLogFile},
+   * considering only commits at or after {@code since}.
+   *
+   * @param repoPath the repository's working-tree path
+   * @param targetLogFile the file to write; created or overwritten
+   * @param since only include commits at or after this instant, or {@code null} for the complete
+   *     history
+   * @return {@code targetLogFile}, for chaining
+   */
+  public Path writeLog(Path repoPath, Path targetLogFile, Instant since) {
     FileRepositoryBuilder builder = new FileRepositoryBuilder().findGitDir(repoPath.toFile());
     if (builder.getGitDir() == null) {
       throw new IllegalArgumentException("Not a Git repository: " + repoPath);
@@ -57,9 +72,16 @@ public final class CodeMaatLogWriter {
         return targetLogFile;
       }
       revWalk.markStart(revWalk.parseCommit(head));
+      long sinceEpochSecond = since == null ? Long.MIN_VALUE : since.getEpochSecond();
       for (RevCommit commit : revWalk) {
         if (commit.getParentCount() > 1) {
           continue;
+        }
+        // RevWalk visits commits newest-first along HEAD's history, so once one commit is older
+        // than the cutoff, every commit still to come is too — the same early-exit git log
+        // --since itself relies on.
+        if (commit.getCommitTime() < sinceEpochSecond) {
+          break;
         }
         writeCommit(repository, revWalk, commit, writer);
       }
