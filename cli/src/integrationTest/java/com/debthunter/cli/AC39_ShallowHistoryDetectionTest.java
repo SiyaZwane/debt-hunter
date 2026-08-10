@@ -35,26 +35,34 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * AC-30: with no explicit baseline and nothing at the pipeline-cache path, a scan still completes
- * normally — {@code baselineProvenance} records {@code NONE}, and every finding compares as new,
- * since there is nothing to compare against.
+ * AC-39: a repository that's a genuine {@code git clone --depth 1} (not a synthesised marker) is
+ * detected and reported as shallow in the scan's run metadata, end to end through the real CLI
+ * path.
  */
 @Tag("integration")
-class AC30_NoBaselineObserveModeTest {
+class AC39_ShallowHistoryDetectionTest {
 
-  private FixtureRepoBuilder fixture;
+  private FixtureRepoBuilder source;
+  private FixtureRepoBuilder clone;
 
   @AfterEach
   void cleanup() {
-    if (fixture != null) {
-      fixture.close();
+    if (clone != null) {
+      clone.close();
+    }
+    if (source != null) {
+      source.close();
     }
   }
 
   @Test
-  void ac30_noBaselineAnywhereCompletesNormallyWithEveryFindingMarkedNew(@TempDir Path outputDir)
-      throws Exception {
-    fixture = FixtureRepoBuilder.init().commitFile("Foo.java", "class Foo {}", "add Foo");
+  void ac39_aRealShallowCloneIsReportedAsShallowInTheScanOutput(
+      @TempDir Path outputDir, @TempDir Path cloneDir) throws Exception {
+    source =
+        FixtureRepoBuilder.init()
+            .commitFile("Foo.java", "class Foo {}", "add Foo")
+            .commitFile("Foo.java", "class Foo { void a() {} }", "touch Foo");
+    clone = source.cloneShallow(cloneDir.resolve("clone"), 1);
 
     AnalysisEngine engine = mock(AnalysisEngine.class);
     when(engine.descriptor())
@@ -69,6 +77,7 @@ class AC30_NoBaselineObserveModeTest {
                         .ruleId("hotspot.rule")
                         .category(Category.HOTSPOT)
                         .severity(Severity.HIGH)
+                        .confidence(0.8)
                         .path("Foo.java")
                         .message("Foo.java changes often")
                         .fingerprint("fp-f-1")
@@ -90,15 +99,15 @@ class AC30_NoBaselineObserveModeTest {
             new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
-        new ScanCommand(fixture.path(), outputDir, null, scanUseCase, List.of(engine));
+        new ScanCommand(clone.path(), outputDir, null, null, scanUseCase, List.of(engine));
 
     int exitCode = command.call();
 
     assertThat(exitCode).isIn(0, 1);
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode root = mapper.readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
-    assertThat(root.get("run").get("baselineProvenance").asText()).isEqualTo("NONE");
-    assertThat(root.get("findings")).hasSize(1);
-    assertThat(root.get("findings").get(0).get("isNew").asBoolean()).isTrue();
+    JsonNode root = new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
+    assertThat(root.get("run").get("historyDepth").asText()).isEqualTo("SHALLOW");
+    // Confidence is reduced (0.8 * 0.5) because the history-dependent finding was produced from an
+    // incomplete history.
+    assertThat(root.get("findings").get(0).get("confidence").asDouble()).isEqualTo(0.4);
   }
 }

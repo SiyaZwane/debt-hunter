@@ -83,7 +83,42 @@ class MarkdownReporterTest {
     assertThat(Files.readString(written)).contains("# Debt Hunter Summary");
   }
 
+  @Test
+  void rendersNoHistoryWarningWhenHistoryIsFull() {
+    ScanResult scanResult = scanResultWith(List.of(), List.of(), HistoryDepth.FULL);
+
+    String markdown = reporter.render(scanResult);
+
+    assertThat(markdown).doesNotContain("Warning");
+  }
+
+  @Test
+  void rendersAHistoryWarningWhenHistoryIsShallow() {
+    ScanResult scanResult = scanResultWith(List.of(), List.of(), HistoryDepth.SHALLOW);
+
+    String markdown = reporter.render(scanResult);
+
+    assertThat(markdown)
+        .contains("**Warning:**")
+        .contains("shallow")
+        .contains("debt-hunter doctor");
+  }
+
+  @Test
+  void rendersAHistoryWarningWhenHistoryIsPartial() {
+    ScanResult scanResult = scanResultWith(List.of(), List.of(), HistoryDepth.PARTIAL);
+
+    String markdown = reporter.render(scanResult);
+
+    assertThat(markdown).contains("**Warning:**").contains("partial");
+  }
+
   private ScanResult scanResultWith(List<Finding> findings, List<EngineStatus> engines) {
+    return scanResultWith(findings, engines, HistoryDepth.FULL);
+  }
+
+  private ScanResult scanResultWith(
+      List<Finding> findings, List<EngineStatus> engines, HistoryDepth historyDepth) {
     AnalysisRun run =
         AnalysisRun.builder()
             .id("run-1")
@@ -91,7 +126,7 @@ class MarkdownReporterTest {
             .timestamp(Instant.parse("2026-01-01T00:00:00Z"))
             .repository("/repo")
             .commit("abc123")
-            .historyDepth(HistoryDepth.FULL)
+            .historyDepth(historyDepth)
             .engines(engines)
             .build();
     return new ScanResult(run, findings, Map.of(), PolicyResult.passed("bundle-1"));

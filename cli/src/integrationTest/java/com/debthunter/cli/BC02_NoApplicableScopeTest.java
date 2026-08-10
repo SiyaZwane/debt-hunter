@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.debthunter.application.history.HistoryDepthEnforcer;
 import com.debthunter.application.scan.ScanUseCase;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.CostClass;
@@ -62,6 +63,7 @@ class BC02_NoApplicableScopeTest {
             new BaselineComparator(),
             new PolicyBundleParser(),
             new PolicyEvaluator(),
+            new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
         new ScanCommand(fixture.path(), outputDir, scanUseCase, List.of(outOfScopeEngine));

@@ -62,6 +62,29 @@ public record Finding(
   }
 
   /**
+   * Returns a copy of this finding with only {@code confidence} changed, for reducing confidence on
+   * history-dependent findings when the available commit history is incomplete.
+   *
+   * @param confidence the new confidence value
+   * @return the copy
+   */
+  public Finding withConfidence(double confidence) {
+    return new Finding(
+        id,
+        ruleId,
+        category,
+        severity,
+        confidence,
+        path,
+        startLine,
+        message,
+        evidence,
+        score,
+        isNew,
+        fingerprint);
+  }
+
+  /**
    * Creates a new builder for constructing a {@link Finding}.
    *
    * @return a fresh, empty builder

@@ -2,9 +2,11 @@ package com.debthunter.testkit;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.concurrent.TimeUnit;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 
@@ -158,6 +160,52 @@ public final class FixtureRepoBuilder implements AutoCloseable {
           "touch " + relativePath + " #" + i);
     }
     return this;
+  }
+
+  /**
+   * Creates a real shallow clone of this repository at {@code destination}, via a native {@code git
+   * clone --depth} subprocess — JGit has no shallow-clone support, and this needs to be genuinely
+   * shallow (a real {@code .git/shallow} marker from a real truncated fetch), not a synthetic
+   * stand-in.
+   *
+   * @param destination the directory to clone into; created if it does not exist
+   * @param depth how many commits of history to fetch
+   * @return a builder wrapping the clone; {@link #close()} on it only closes JGit handles, since
+   *     the caller owns {@code destination}'s lifetime
+   */
+  public FixtureRepoBuilder cloneShallow(Path destination, int depth) {
+    try {
+      Files.createDirectories(destination);
+      // --no-local forces the standard fetch-pack protocol even though the source is a local
+      // path: git's default "local" clone optimisation (hardlinking objects) bypasses shallow
+      // negotiation entirely and would silently ignore --depth.
+      Process process =
+          new ProcessBuilder(
+                  "git",
+                  "clone",
+                  "--no-local",
+                  "--depth",
+                  String.valueOf(depth),
+                  root.toString(),
+                  destination.toString())
+              .redirectErrorStream(true)
+              .start();
+      String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+      boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+      if (!finished) {
+        process.destroyForcibly();
+        throw new IllegalStateException("git clone --depth timed out");
+      }
+      if (process.exitValue() != 0) {
+        throw new IllegalStateException("git clone --depth failed: " + output);
+      }
+      return new FixtureRepoBuilder(destination, Git.open(destination.toFile()), false);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while cloning " + root, e);
+    }
   }
 
   /**

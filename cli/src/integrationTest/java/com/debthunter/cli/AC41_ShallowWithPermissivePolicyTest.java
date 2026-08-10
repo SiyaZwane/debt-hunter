@@ -27,6 +27,7 @@ import com.debthunter.repository.GitHistoryProvider;
 import com.debthunter.testkit.FixtureRepoBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -35,12 +36,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * AC-30: with no explicit baseline and nothing at the pipeline-cache path, a scan still completes
- * normally — {@code baselineProvenance} records {@code NONE}, and every finding compares as new,
- * since there is nothing to compare against.
+ * AC-41: a shallow repository with no policy history requirement (or one that permits shallow
+ * history) still completes the scan normally — but history-dependent findings carry reduced
+ * confidence.
  */
 @Tag("integration")
-class AC30_NoBaselineObserveModeTest {
+class AC41_ShallowWithPermissivePolicyTest {
 
   private FixtureRepoBuilder fixture;
 
@@ -52,13 +53,14 @@ class AC30_NoBaselineObserveModeTest {
   }
 
   @Test
-  void ac30_noBaselineAnywhereCompletesNormallyWithEveryFindingMarkedNew(@TempDir Path outputDir)
-      throws Exception {
+  void ac41_shallowHistoryWithNoPolicyRequirementCompletesWithReducedConfidence(
+      @TempDir Path outputDir) throws Exception {
     fixture = FixtureRepoBuilder.init().commitFile("Foo.java", "class Foo {}", "add Foo");
+    Files.createFile(fixture.path().resolve(".git").resolve("shallow"));
 
     AnalysisEngine engine = mock(AnalysisEngine.class);
     when(engine.descriptor())
-        .thenReturn(new EngineDescriptor("fake", "1.0", List.of(Category.HOTSPOT), CostClass.LOW));
+        .thenReturn(new EngineDescriptor("fake", "1.0", List.of(Category.CHURN), CostClass.LOW));
     when(engine.supports(any(RepositoryContext.class))).thenReturn(true);
     when(engine.analyse(any(), any()))
         .thenReturn(
@@ -66,11 +68,12 @@ class AC30_NoBaselineObserveModeTest {
                 List.of(
                     Finding.builder()
                         .id("f-1")
-                        .ruleId("hotspot.rule")
-                        .category(Category.HOTSPOT)
-                        .severity(Severity.HIGH)
+                        .ruleId("churn.rule")
+                        .category(Category.CHURN)
+                        .severity(Severity.MEDIUM)
+                        .confidence(0.8)
                         .path("Foo.java")
-                        .message("Foo.java changes often")
+                        .message("Foo.java churns")
                         .fingerprint("fp-f-1")
                         .build()),
                 List.of(),
@@ -90,15 +93,13 @@ class AC30_NoBaselineObserveModeTest {
             new HistoryDepthEnforcer(),
             "0.1.0-test");
     ScanCommand command =
-        new ScanCommand(fixture.path(), outputDir, null, scanUseCase, List.of(engine));
+        new ScanCommand(fixture.path(), outputDir, null, null, scanUseCase, List.of(engine));
 
     int exitCode = command.call();
 
     assertThat(exitCode).isIn(0, 1);
-    ObjectMapper mapper = new ObjectMapper();
-    JsonNode root = mapper.readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
-    assertThat(root.get("run").get("baselineProvenance").asText()).isEqualTo("NONE");
-    assertThat(root.get("findings")).hasSize(1);
-    assertThat(root.get("findings").get(0).get("isNew").asBoolean()).isTrue();
+    JsonNode root = new ObjectMapper().readTree(outputDir.resolve(JsonReporter.FILE_NAME).toFile());
+    assertThat(root.get("run").get("historyDepth").asText()).isEqualTo("SHALLOW");
+    assertThat(root.get("findings").get(0).get("confidence").asDouble()).isEqualTo(0.4);
   }
 }
