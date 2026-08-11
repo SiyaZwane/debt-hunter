@@ -9,7 +9,6 @@ import com.debthunter.output.MarkdownReporter;
 import com.debthunter.output.MetricsReporter;
 import com.debthunter.output.SarifReporter;
 import com.debthunter.testkit.FixtureRepoBuilder;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -47,10 +46,7 @@ class AC05_OfflineContainerScanTest {
     try (FixtureRepoBuilder fixture = FixtureRepoBuilder.initAt(fixtureDir)) {
       fixture.commitFile("Foo.java", "class Foo {}", "add Foo");
     }
-    // A missing bind-mount source is auto-created by the Docker daemon as root:root on Linux,
-    // which the non-root container user (uid 10001) then can't write into — create it ourselves
-    // first so the mounted directory is owned by the host user instead.
-    Files.createDirectories(outputDir);
+    DockerTestSupport.createWritableOutputDir(outputDir);
 
     DockerTestSupport.ProcessResult result =
         DockerTestSupport.run(

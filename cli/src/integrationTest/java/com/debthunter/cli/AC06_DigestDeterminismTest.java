@@ -9,7 +9,6 @@ import com.debthunter.testkit.FixtureRepoBuilder;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -92,10 +91,7 @@ class AC06_DigestDeterminismTest {
 
   private JsonNode scanWith(String imageReference, Path fixtureDir, Path outputDir)
       throws Exception {
-    // A missing bind-mount source is auto-created by the Docker daemon as root:root on Linux,
-    // which the non-root container user (uid 10001) then can't write into — create it ourselves
-    // first so the mounted directory is owned by the host user instead.
-    Files.createDirectories(outputDir);
+    DockerTestSupport.createWritableOutputDir(outputDir);
     DockerTestSupport.ProcessResult result =
         DockerTestSupport.run(
             DockerTestSupport.repoRoot(),

@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +60,22 @@ public final class DockerTestSupport {
   public static Path createHomeTempDir(String prefix) throws IOException {
     Path home = Path.of(System.getProperty("user.home"));
     return Files.createTempDirectory(home, prefix);
+  }
+
+  /**
+   * Creates a directory intended to be bind-mounted as a container's writable output directory. A
+   * bind mount exposes the host filesystem's real numeric uid/gid, unaffected by the container's
+   * own user database — so a directory merely created (and thus owned) by the host user, at its
+   * default permissions, is not writable by the image's baked-in non-root user (uid 10001) on a
+   * real Linux Docker daemon, even though it may appear to work under a macOS Docker Desktop/Colima
+   * VM's more permissive file-sharing layer. Making it world-writable sidesteps the uid mismatch
+   * without needing to know or match the container's specific uid.
+   *
+   * @param directory the directory to create
+   */
+  public static void createWritableOutputDir(Path directory) throws IOException {
+    Files.createDirectories(directory);
+    Files.setPosixFilePermissions(directory, PosixFilePermissions.fromString("rwxrwxrwx"));
   }
 
   /**
