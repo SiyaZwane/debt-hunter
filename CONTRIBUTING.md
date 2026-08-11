@@ -52,7 +52,16 @@ path to where you cloned this repo, and re-run the `package` command above whene
 debt-hunter() { java -jar /path/to/debt-hunter/cli/target/debt-hunter.jar "$@"; }
 ```
 
-```bash
+On Windows PowerShell, add a function to your `$PROFILE` instead:
+
+```powershell
+# $PROFILE
+function debt-hunter { java -jar C:\path\to\debt-hunter\cli\target\debt-hunter.jar @args }
+```
+
+Either way, the call itself is the same:
+
+```
 debt-hunter scan --repo /path/to/other-project --output-dir /path/to/other-project/debt-hunter-output
 ```
 
