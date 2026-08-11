@@ -35,18 +35,7 @@ public final class HttpExplainer implements Explainer {
   }
 
   @Override
-  public Explanation explain(Finding finding, ExplainConfig config) {
-    String prompt =
-        "Explain this technical-debt finding in plain language.\n"
-            + "rule: "
-            + finding.ruleId()
-            + "\n"
-            + "path: "
-            + finding.path()
-            + "\n"
-            + "message: "
-            + finding.message();
-
+  public Explanation explain(Finding finding, String prompt, ExplainConfig config) {
     HttpRequest.Builder requestBuilder =
         HttpRequest.newBuilder()
             .uri(config.endpoint())
