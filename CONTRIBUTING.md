@@ -23,6 +23,25 @@ To auto-fix formatting instead of just checking it:
 ./mvnw spotless:apply
 ```
 
+## Running the CLI locally
+
+For the day-to-day edit/test loop, run the packaged jar directly rather than rebuilding the Docker
+image — it's a plain JVM process, seconds instead of minutes, and skips `jdeps`/`jlink`/image
+layering entirely:
+
+```bash
+./mvnw -pl cli -am package -DskipTests
+java -jar cli/target/debt-hunter.jar scan --repo . --output-dir ./out
+```
+
+Reach for the Docker image (see "Building and testing the container image" below) only when you
+need to verify something the jar genuinely can't from a plain JVM process: non-root execution,
+`--network none`, or bind-mount permission behaviour under the image's baked-in uid 10001. These
+can differ from a `java -jar` run in ways that only show up on a real container — a bind-mount
+permissions bug once passed locally on macOS's Docker Desktop and only surfaced in CI on a real
+Linux Docker daemon. Use the jar for fast iteration, the image as a slower pre-merge check, not one
+in place of the other.
+
 ## Test suites
 
 Tests live in three source sets, each with a different cost and a different default:

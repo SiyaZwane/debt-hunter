@@ -1,0 +1,33 @@
+# Sample Debt Hunter architecture rules file. See docs/configuration.md for the full reference.
+#
+# Copy to .debt-hunter-arch.yml at your repository root to activate it; ArchitectureRulesEngine
+# is a no-op when the file is absent. Each rule's `appliesTo` is a slash-separated glob matched
+# against a file's path relative to the repo root (** matches zero or more whole path segments,
+# including zero — so "**/domain/**/*.java" also matches a file directly inside domain/, not only
+# one nested further down). An import pattern ending in ".**" matches that package and everything
+# under it; anything else must match an import exactly.
+#
+# These two rules illustrate the guarantee behind AD-02 (domain-purity enforcement) and AD-09 (AI
+# off the gate path) using this project's own real module boundaries. In this actual repository
+# that guarantee is already enforced structurally, via separate Maven modules and an enforcer rule
+# (see domain/pom.xml) — .debt-hunter-arch.yml is most useful for a project that can't rely on
+# module-per-layer separation and wants the same kind of import-boundary check anyway.
+
+rules:
+  # Mirrors AD-02: the domain layer must stay pure — no I/O, no framework, no engine libraries.
+  - id: domain-stays-pure
+    appliesTo: "domain/src/main/java/**/*.java"
+    deniedImports:
+      - "com.fasterxml.jackson.**"
+      - "org.eclipse.jgit.**"
+      - "org.yaml.snakeyaml.**"
+      - "info.picocli.**"
+      - "org.springframework.**"
+    severity: HIGH
+
+  # Mirrors AD-09: AI/LLM behaviour must never sit between the CLI and the core scan pipeline.
+  - id: ai-off-the-gate-path
+    appliesTo: "application/src/main/java/**/*.java"
+    deniedImports:
+      - "com.debthunter.ai.**"
+    severity: CRITICAL
