@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    name: Build, unit + integration tests, coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Build and run unit tests (includes Spotless, SpotBugs, domain-purity check, JaCoCo 80% gate)
+        run: ./mvnw -B clean verify
+
+      - name: Run integration tests
+        run: ./mvnw -B verify -Dfailsafe.groups=integration
+
+      - name: Upload JaCoCo coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-reports
+          path: "*/target/site/jacoco/"
+          retention-days: 14
+
+  docker:
+    name: Container-based tests (non-root, offline, boundary conditions)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      # Quality gates (Spotless, SpotBugs, the domain-purity enforcer rule, JaCoCo's 80% coverage
+      # check) are already verified by the `build` job. Skip them here: overriding
+      # -Dfailsafe.groups to `docker` for this reactor slice means modules with no docker-tagged
+      # tests of their own (e.g. testkit) would otherwise fail their *own* coverage check, since
+      # their normal integration-tagged tests don't run under this group selection.
+      - name: Run docker-tagged CLI integration tests
+        run: >-
+          ./mvnw -B -pl cli -am verify -Dfailsafe.groups=docker
+          -Djacoco.skip=true -Dspotless.check.skip=true -Dspotbugs.skip=true -Denforcer.skip=true

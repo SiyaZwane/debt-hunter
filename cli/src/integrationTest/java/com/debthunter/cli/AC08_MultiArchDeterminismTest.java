@@ -78,6 +78,7 @@ class AC08_MultiArchDeterminismTest {
   }
 
   private JsonNode scanWith(String imageTag, Path fixtureDir, Path outputDir) throws Exception {
+    DockerTestSupport.createWritableOutputDir(outputDir);
     DockerTestSupport.ProcessResult result =
         DockerTestSupport.run(
             DockerTestSupport.repoRoot(),

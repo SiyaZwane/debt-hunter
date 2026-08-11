@@ -91,6 +91,7 @@ class AC06_DigestDeterminismTest {
 
   private JsonNode scanWith(String imageReference, Path fixtureDir, Path outputDir)
       throws Exception {
+    DockerTestSupport.createWritableOutputDir(outputDir);
     DockerTestSupport.ProcessResult result =
         DockerTestSupport.run(
             DockerTestSupport.repoRoot(),
