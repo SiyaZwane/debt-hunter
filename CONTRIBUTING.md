@@ -34,6 +34,28 @@ layering entirely:
 java -jar cli/target/debt-hunter.jar scan --repo . --output-dir ./out
 ```
 
+To scan a repository other than this one, point `--repo` at any other local checkout — Debt Hunter
+never clones or fetches, so it must already exist on disk — and `--output-dir` wherever you want the
+reports written; neither has to be under this project's directory:
+
+```bash
+java -jar /path/to/debt-hunter/cli/target/debt-hunter.jar scan \
+  --repo /path/to/other-project \
+  --output-dir /path/to/other-project/debt-hunter-output
+```
+
+For a shorter command, add a shell function so `debt-hunter` runs from anywhere (adjust the jar
+path to where you cloned this repo, and re-run the `package` command above whenever you rebuild):
+
+```bash
+# ~/.zshrc or ~/.bashrc
+debt-hunter() { java -jar /path/to/debt-hunter/cli/target/debt-hunter.jar "$@"; }
+```
+
+```bash
+debt-hunter scan --repo /path/to/other-project --output-dir /path/to/other-project/debt-hunter-output
+```
+
 Reach for the Docker image (see "Building and testing the container image" below) only when you
 need to verify something the jar genuinely can't from a plain JVM process: non-root execution,
 `--network none`, or bind-mount permission behaviour under the image's baked-in uid 10001. These
