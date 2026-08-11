@@ -6,7 +6,9 @@ import com.debthunter.domain.Category;
 import com.debthunter.domain.Finding;
 import com.debthunter.domain.PolicyStatus;
 import com.debthunter.domain.Severity;
+import com.debthunter.domain.SuppressionEntry;
 import com.debthunter.engine.spi.AnalysisMode;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -250,6 +252,62 @@ class PolicyEvaluatorTest {
     assertThat(result.reasons()).hasSize(2);
     assertThat(result.reasons().stream().map(v -> v.rule()).toList())
         .containsExactlyInAnyOrder("no-critical", "fail-on:HIGH");
+  }
+
+  @Test
+  void aSuppressedFindingIsExcludedFromItsRule() {
+    PolicyBundle bundle = bundleWithMainRule("no-critical", Severity.CRITICAL, 0);
+    Finding critical = finding("f-1", Severity.CRITICAL, true);
+    SuppressionEntry suppression =
+        new SuppressionEntry("fp-f-1", "alice", "tracked", LocalDate.parse("2099-01-01"));
+
+    var result =
+        evaluator.evaluate(
+            List.of(critical), bundle, AnalysisMode.FULL, null, List.of(suppression));
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aSuppressedFindingIsAlsoExcludedFromTheFailOnOverride() {
+    Finding high = finding("f-1", Severity.HIGH, true);
+    SuppressionEntry suppression =
+        new SuppressionEntry("fp-f-1", "alice", "tracked", LocalDate.parse("2099-01-01"));
+
+    var result =
+        evaluator.evaluate(
+            List.of(high),
+            PolicyBundle.permissive(),
+            AnalysisMode.FULL,
+            Severity.HIGH,
+            List.of(suppression));
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.PASSED);
+  }
+
+  @Test
+  void aSuppressionForADifferentFingerprintDoesNotExcludeThisFinding() {
+    PolicyBundle bundle = bundleWithMainRule("no-critical", Severity.CRITICAL, 0);
+    Finding critical = finding("f-1", Severity.CRITICAL, true);
+    SuppressionEntry suppression =
+        new SuppressionEntry(
+            "fp-some-other-finding", "alice", "tracked", LocalDate.parse("2099-01-01"));
+
+    var result =
+        evaluator.evaluate(
+            List.of(critical), bundle, AnalysisMode.FULL, null, List.of(suppression));
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.FAILED);
+  }
+
+  @Test
+  void withNoSuppressionsListTheFourArgOverloadBehavesAsBefore() {
+    PolicyBundle bundle = bundleWithMainRule("no-critical", Severity.CRITICAL, 0);
+    Finding critical = finding("f-1", Severity.CRITICAL, true);
+
+    var result = evaluator.evaluate(List.of(critical), bundle, AnalysisMode.FULL, null);
+
+    assertThat(result.status()).isEqualTo(PolicyStatus.FAILED);
   }
 
   private PolicyBundle bundleWithMainRule(String id, Severity severity, int maxCount) {

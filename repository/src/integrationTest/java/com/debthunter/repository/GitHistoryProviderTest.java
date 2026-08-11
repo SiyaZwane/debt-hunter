@@ -43,6 +43,7 @@ class GitHistoryProviderTest {
     assertThat(info.commitCount()).isEqualTo(3);
     assertThat(info.headCommit()).isNotBlank();
     assertThat(info.headBranch()).isEqualTo("main");
+    assertThat(info.headCommitDate()).isNotNull();
   }
 
   @Test
@@ -62,6 +63,7 @@ class GitHistoryProviderTest {
     assertThat(info.commitCount()).isZero();
     assertThat(info.headCommit()).isNull();
     assertThat(info.headBranch()).isEqualTo("main");
+    assertThat(info.headCommitDate()).isNull();
   }
 
   @Test

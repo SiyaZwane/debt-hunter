@@ -1,8 +1,9 @@
 package com.debthunter.cli;
 
 import com.debthunter.ai.ExplainConfig;
+import com.debthunter.ai.ExplainedFinding;
 import com.debthunter.ai.Explainer;
-import com.debthunter.ai.Explanation;
+import com.debthunter.ai.FindingExplainer;
 import com.debthunter.ai.HttpExplainer;
 import com.debthunter.application.scan.ExitCode;
 import com.debthunter.domain.Finding;
@@ -47,23 +48,27 @@ public final class ExplainCommand implements Callable<Integer> {
   private Duration explainTimeout = Duration.ofSeconds(30);
 
   private final JsonReporter jsonReporter;
-  private final Explainer explainer;
+  private final FindingExplainer findingExplainer;
 
   /** Constructs the command as picocli will: with the default, production collaborators. */
   public ExplainCommand() {
-    this(new JsonReporter(), new HttpExplainer());
+    this(new JsonReporter(), new FindingExplainer(new HttpExplainer()));
   }
 
   /**
-   * Constructs the command with explicit collaborators, bypassing picocli option parsing entirely,
-   * for testing.
+   * Constructs the command with an explicit {@link Explainer}, bypassing picocli option parsing
+   * entirely, for testing.
    *
    * @param jsonReporter reads the previously written report
    * @param explainer requests the explanation
    */
   ExplainCommand(JsonReporter jsonReporter, Explainer explainer) {
+    this(jsonReporter, new FindingExplainer(explainer));
+  }
+
+  private ExplainCommand(JsonReporter jsonReporter, FindingExplainer findingExplainer) {
     this.jsonReporter = jsonReporter;
-    this.explainer = explainer;
+    this.findingExplainer = findingExplainer;
   }
 
   /**
@@ -106,12 +111,13 @@ public final class ExplainCommand implements Callable<Integer> {
     }
 
     ExplainConfig config = new ExplainConfig(explainEndpoint, explainApiKey, explainTimeout);
-    Explanation explanation = explainer.explain(finding.get(), config);
-    if (explanation.available()) {
-      System.out.println(explanation.text());
-    } else {
-      System.out.println("Explanation unavailable: " + explanation.text());
+    ExplainedFinding explained = findingExplainer.explain(finding.get(), config);
+    if (!explained.available()) {
+      System.err.println("Explanation unavailable: " + explained.explanation());
+      return ExitCode.POLICY_SATISFIED.code();
     }
+    System.out.println(explained.explanation());
+    System.out.println(explained.remediation());
     return ExitCode.POLICY_SATISFIED.code();
   }
 }

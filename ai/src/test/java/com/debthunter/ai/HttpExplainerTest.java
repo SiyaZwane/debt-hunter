@@ -37,7 +37,10 @@ class HttpExplainerTest {
         startServer(200, "This method changes often because it mixes two concerns.", receivedBody);
 
     Explanation explanation =
-        explainer.explain(finding(), configFor(server.getAddress().getPort()));
+        explainer.explain(
+            finding(),
+            "rule: hotspot.rule\npath: Foo.java",
+            configFor(server.getAddress().getPort()));
 
     assertThat(explanation.available()).isTrue();
     assertThat(explanation.text())
@@ -50,7 +53,7 @@ class HttpExplainerTest {
     server = startServer(500, "", new AtomicReference<>());
 
     Explanation explanation =
-        explainer.explain(finding(), configFor(server.getAddress().getPort()));
+        explainer.explain(finding(), "prompt", configFor(server.getAddress().getPort()));
 
     assertThat(explanation.available()).isFalse();
     assertThat(explanation.text()).contains("500");
@@ -61,7 +64,7 @@ class HttpExplainerTest {
     ExplainConfig config =
         new ExplainConfig(URI.create("http://127.0.0.1:1"), null, Duration.ofSeconds(2));
 
-    Explanation explanation = explainer.explain(finding(), config);
+    Explanation explanation = explainer.explain(finding(), "prompt", config);
 
     assertThat(explanation.available()).isFalse();
     assertThat(explanation.text()).isNotBlank();
@@ -89,7 +92,7 @@ class HttpExplainerTest {
             URI.create("http://127.0.0.1:" + server.getAddress().getPort()),
             "secret-key",
             Duration.ofSeconds(5));
-    explainer.explain(finding(), config);
+    explainer.explain(finding(), "prompt", config);
 
     assertThat(receivedAuthHeader.get()).isEqualTo("Bearer secret-key");
   }
@@ -100,7 +103,8 @@ class HttpExplainerTest {
     server = startServer(200, "ok", receivedBody);
     Explainer explicit = new HttpExplainer(HttpClient.newHttpClient());
 
-    Explanation explanation = explicit.explain(finding(), configFor(server.getAddress().getPort()));
+    Explanation explanation =
+        explicit.explain(finding(), "prompt", configFor(server.getAddress().getPort()));
 
     assertThat(explanation.available()).isTrue();
   }

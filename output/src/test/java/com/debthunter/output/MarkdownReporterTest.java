@@ -11,10 +11,12 @@ import com.debthunter.domain.HistoryDepth;
 import com.debthunter.domain.PolicyResult;
 import com.debthunter.domain.ScanResult;
 import com.debthunter.domain.Severity;
+import com.debthunter.domain.SuppressionEntry;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -124,6 +126,44 @@ class MarkdownReporterTest {
     String markdown = reporter.render(scanResult);
 
     assertThat(markdown).contains("**Warning:**").contains("partial");
+  }
+
+  @Test
+  void rendersNoActiveSuppressionsMessageWhenEmpty() {
+    ScanResult scanResult = scanResultWith(List.of(), List.of());
+
+    String markdown = reporter.render(scanResult, List.of());
+
+    assertThat(markdown).contains("## Active suppressions (0)");
+    assertThat(markdown).contains("No active suppressions.");
+  }
+
+  @Test
+  void rendersEachActiveSuppressionWithOwnerReasonAndExpiry() {
+    ScanResult scanResult = scanResultWith(List.of(), List.of());
+    SuppressionEntry suppression =
+        new SuppressionEntry("fp-1", "alice", "tracked in JIRA-123", LocalDate.parse("2026-06-01"));
+
+    String markdown = reporter.render(scanResult, List.of(suppression));
+
+    assertThat(markdown).contains("## Active suppressions (1)");
+    assertThat(markdown)
+        .contains("fp-1")
+        .contains("alice")
+        .contains("2026-06-01")
+        .contains("tracked in JIRA-123");
+  }
+
+  @Test
+  void writeWithSuppressionsWritesTheSameListingAsRender(@TempDir Path outputDir)
+      throws IOException {
+    SuppressionEntry suppression =
+        new SuppressionEntry("fp-1", "alice", "tracked", LocalDate.parse("2026-06-01"));
+
+    Path written =
+        reporter.write(scanResultWith(List.of(), List.of()), outputDir, List.of(suppression));
+
+    assertThat(Files.readString(written)).contains("fp-1").contains("alice");
   }
 
   private ScanResult scanResultWith(List<Finding> findings, List<EngineStatus> engines) {

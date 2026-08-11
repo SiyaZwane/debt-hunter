@@ -31,7 +31,8 @@ class ExplainCommandTest {
   void anAvailableExplanationReturnsThePolicySatisfiedExitCode(@TempDir Path outputDir) {
     Path reportFile = writeReport(outputDir);
     Explainer explainer = mock(Explainer.class);
-    when(explainer.explain(any(), any())).thenReturn(Explanation.ofAvailable("f-1", "it's fine"));
+    when(explainer.explain(any(), any(), any()))
+        .thenReturn(Explanation.ofAvailable("f-1", "it's fine"));
     ExplainCommand command =
         new ExplainCommand(reportFile, "f-1", ENDPOINT, new JsonReporter(), explainer);
 
@@ -44,7 +45,7 @@ class ExplainCommandTest {
   void anUnavailableExplanationStillReturnsThePolicySatisfiedExitCode(@TempDir Path outputDir) {
     Path reportFile = writeReport(outputDir);
     Explainer explainer = mock(Explainer.class);
-    when(explainer.explain(any(), any()))
+    when(explainer.explain(any(), any(), any()))
         .thenReturn(Explanation.ofUnavailable("f-1", "connection refused"));
     ExplainCommand command =
         new ExplainCommand(reportFile, "f-1", ENDPOINT, new JsonReporter(), explainer);

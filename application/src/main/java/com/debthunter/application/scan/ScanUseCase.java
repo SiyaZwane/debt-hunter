@@ -11,6 +11,7 @@ import com.debthunter.domain.PolicyResult;
 import com.debthunter.domain.PolicyStatus;
 import com.debthunter.domain.PolicyViolation;
 import com.debthunter.domain.ScanResult;
+import com.debthunter.domain.SuppressionEntry;
 import com.debthunter.engine.spi.AnalysisEngine;
 import com.debthunter.engine.spi.AnalysisRequest;
 import com.debthunter.engine.spi.EngineResult;
@@ -32,6 +33,9 @@ import com.debthunter.policy.PolicyComposer;
 import com.debthunter.policy.PolicyEvaluator;
 import com.debthunter.policy.PolicyLoosenedException;
 import com.debthunter.policy.PolicyParseException;
+import com.debthunter.policy.SuppressionParseException;
+import com.debthunter.policy.SuppressionRegistry;
+import com.debthunter.policy.SuppressionRejectedException;
 import com.debthunter.repository.HistoryWindow;
 import com.debthunter.repository.RepositoryAccessException;
 import com.debthunter.repository.RepositoryHistoryProvider;
@@ -39,6 +43,8 @@ import com.debthunter.repository.RepositoryInfo;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,6 +71,7 @@ public final class ScanUseCase {
   // start) — instantiated directly rather than threaded through both constructors and every one
   // of their many existing call sites.
   private final ProjectSlicer projectSlicer = new ProjectSlicer();
+  private final SuppressionRegistry suppressionRegistry = new SuppressionRegistry();
 
   private final RepositoryHistoryProvider historyProvider;
   private final JsonReporter jsonReporter;
@@ -215,6 +222,15 @@ public final class ScanUseCase {
           ExitCode.CONFIGURATION_ERROR.code(), "Invalid policy: " + e.getMessage());
     }
 
+    LocalDate commitDate = commitDate(repoInfo);
+    List<SuppressionEntry> activeSuppressions;
+    try {
+      activeSuppressions = loadActiveSuppressions(request, policyBundle, commitDate);
+    } catch (SuppressionParseException | SuppressionRejectedException e) {
+      return ScanOutcome.ofError(
+          ExitCode.CONFIGURATION_ERROR.code(), "Invalid suppressions: " + e.getMessage());
+    }
+
     HistoryDepth historyDepth = mapHistoryDepth(repoInfo, request.historyWindow());
     HistoryDepthCheck historyDepthCheck =
         historyDepthEnforcer.check(historyDepth, policyBundle.minimumHistoryDepth());
@@ -288,10 +304,15 @@ public final class ScanUseCase {
 
     PolicyResult policyResult =
         sliceByProject
-            ? evaluatePerProject(findingsByProject, policyBundle, request, baselineResolution)
+            ? evaluatePerProject(
+                findingsByProject, policyBundle, request, baselineResolution, activeSuppressions)
             : applyObserveMode(
                 policyEvaluator.evaluate(
-                    comparison.findings(), policyBundle, request.mode(), request.failOn()),
+                    comparison.findings(),
+                    policyBundle,
+                    request.mode(),
+                    request.failOn(),
+                    activeSuppressions),
                 baselineResolution);
     int exitCode =
         policyResult.status() == PolicyStatus.FAILED
@@ -303,7 +324,7 @@ public final class ScanUseCase {
 
     try {
       jsonReporter.write(scanResult, request.outputDir());
-      markdownReporter.write(scanResult, request.outputDir());
+      markdownReporter.write(scanResult, request.outputDir(), activeSuppressions);
       metricsReporter.write(scanResult, request.outputDir());
       if (sliceByProject) {
         sarifReporter.writeMultiProject(findingsByProject, toolVersion, request.outputDir());
@@ -334,7 +355,8 @@ public final class ScanUseCase {
       Map<String, List<Finding>> findingsByProject,
       PolicyBundle policyBundle,
       ScanRequest request,
-      BaselineResolution baselineResolution) {
+      BaselineResolution baselineResolution,
+      List<SuppressionEntry> activeSuppressions) {
     List<PolicyViolation> combinedReasons = new ArrayList<>();
     boolean anyFailed = false;
     boolean anyWouldFail = false;
@@ -342,7 +364,11 @@ public final class ScanUseCase {
       PolicyResult perProject =
           applyObserveMode(
               policyEvaluator.evaluate(
-                  entry.getValue(), policyBundle, request.mode(), request.failOn()),
+                  entry.getValue(),
+                  policyBundle,
+                  request.mode(),
+                  request.failOn(),
+                  activeSuppressions),
               baselineResolution);
       anyFailed |= perProject.status() == PolicyStatus.FAILED;
       anyWouldFail |= perProject.status() == PolicyStatus.WOULD_FAIL;
@@ -423,5 +449,27 @@ public final class ScanUseCase {
 
   private Instant historyWindowSince(HistoryWindow window) {
     return window == null ? null : window.since();
+  }
+
+  /**
+   * The scanned commit's date, in UTC — never the wall clock, so a suppression's expiry always
+   * evaluates the same way for the same commit, no matter which day the scan actually runs. {@code
+   * null} if the repository has no commits at all, in which case there is nothing to anchor
+   * suppression expiry to and none can meaningfully apply.
+   */
+  private LocalDate commitDate(RepositoryInfo repoInfo) {
+    Instant headCommitDate = repoInfo.headCommitDate();
+    return headCommitDate == null ? null : headCommitDate.atZone(ZoneOffset.UTC).toLocalDate();
+  }
+
+  private List<SuppressionEntry> loadActiveSuppressions(
+      ScanRequest request, PolicyBundle policyBundle, LocalDate commitDate) {
+    if (commitDate == null) {
+      return List.of();
+    }
+    List<SuppressionEntry> suppressions =
+        suppressionRegistry.load(
+            request.repoPath(), policyBundle.suppressionsMaxExpiryDays(), commitDate);
+    return suppressions.stream().filter(s -> s.isActiveOn(commitDate)).toList();
   }
 }
