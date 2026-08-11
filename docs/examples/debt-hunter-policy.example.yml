@@ -1,0 +1,51 @@
+# Sample Debt Hunter policy bundle. See docs/configuration.md for the full reference.
+#
+# This exact shape is used for BOTH:
+#   - a central policy bundle, passed to `scan`/`policy` via --policy <path>
+#   - a repo-local override, read automatically from .debt-hunter.yml at the repo root
+#     (composed with the central bundle under a tighten-only rule — see docs/configuration.md
+#     and docs/architecture-decisions/AD-08-tighten-only-policy-composition.md)
+
+version: "1.0"
+
+metadata:
+  name: default
+
+analysis:
+  # Findings computed from commit history (hotspot, churn, temporal-coupling,
+  # knowledge-concentration) get reduced confidence below this depth; a repository with less
+  # history than this fails the scan with exit code 4. One of FULL | PARTIAL | SHALLOW.
+  minimumHistoryDepth: FULL
+
+policy:
+  # Rules evaluated on a full scan (FULL mode).
+  main:
+    rules:
+      # No new finding at CRITICAL severity is tolerated at all.
+      - id: no-new-critical
+        severity: CRITICAL
+        maxCount: 0
+      # Up to 5 new findings at HIGH severity or worse (i.e. HIGH or CRITICAL) are tolerated.
+      - id: limited-new-high
+        severity: HIGH
+        maxCount: 5
+
+  # Rules evaluated in pull-request mode (--mode PULL_REQUEST), typically stricter since the
+  # change under review is smaller and easier to fix before merging.
+  pullRequest:
+    rules:
+      - id: no-new-critical-or-high-in-pr
+        severity: HIGH
+        maxCount: 0
+
+exclusions:
+  # Category names to exclude entirely from policy evaluation (still reported, never gates).
+  categories: []
+  # Exact or path-prefix matches to exclude from policy evaluation entirely.
+  paths:
+    - "generated/"
+
+suppressions:
+  # The longest expiry a .debt-hunter-suppressions.yml entry may request; see
+  # docs/configuration.md for the suppressions file's own shape.
+  maxExpiryDays: 90

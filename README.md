@@ -124,6 +124,24 @@ debt-hunter [-hV] [COMMAND]
 | `--repo <path>` | Repository to check. Default: `.` |
 | `--policy <path>` | Path to the central policy bundle file. |
 
+## Configuration
+
+Every config file is optional — a repository with none of them scans successfully under a
+permissive default policy. What's available:
+
+| File | Purpose |
+|---|---|
+| central policy bundle (via `--policy`) | The organisation-wide floor `scan` gates against |
+| `.debt-hunter.yml` | A repo-local, tighten-only override of the central policy |
+| `.debt-hunter-suppressions.yml` | Time-boxed, owned exemptions for specific findings |
+| `.debt-hunter-arch.yml` | Declarative import/layering rules, checked by `ArchitectureRulesEngine` |
+| `sonar-report.json` | A pre-existing SonarQube issues-search export, adapted by `StaticAnalysisEngine` |
+
+See [`docs/configuration.md`](docs/configuration.md) for the full reference (exact shape, field
+semantics, tighten-only composition rules) and [`docs/examples/`](docs/examples/) for two complete,
+verified starting points: [a policy bundle](docs/examples/debt-hunter-policy.example.yml) and
+[an architecture rules file](docs/examples/debt-hunter-arch.example.yml).
+
 ## Exit codes
 
 Every command returns one of the same process-level exit codes (`ExitCode`); `scan` is the only
